@@ -1,22 +1,58 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from .serializers import UserRegistrationSerializer, UserLoginSerializer
 from rest_framework import status
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer
+from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 
+def create_default_groups():
+    for role in ['admin', 'developer', 'viewer']:
+        Group.objects.get_or_create(name=role)
 
+class IsAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.groups.filter(name='admin').exists()
+
+class IsDeveloper(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.groups.filter(name='developer').exists()
+
+class IsViewer(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.groups.filter(name='viewer').exists()
+    
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def home_view(request):
-    content = {'message': 'Hello, World!'}
-    return Response(content)
+def root_view(request):
+    return Response({"message": f"Welcome {request.user.username}"})
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsAdmin])
+def admin_only_view(request):
+    return Response({"message": "Hello Admin!"})
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsDeveloper])
+def developer_only_view(request):
+    return Response({"message": "Hello Developer!"})
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated, IsViewer])
+def viewer_only_view(request):
+    return Response({"message": "Hello Viewer!"})
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
+    roles = list(user.groups.values_list('name', flat=True))
+    if roles:
+        refresh['role'] = roles[0]  # Add role to token payload
     return {
         'refresh': str(refresh),
         'access': str(refresh.access_token),
@@ -24,9 +60,14 @@ def get_tokens_for_user(user):
 
 @api_view(['POST'])
 def register_user(request):
+    create_default_groups()
     serializer = UserRegistrationSerializer(data=request.data)
+    role = request.data.get('role')  # 'admin', 'developer', or 'viewer'
     if serializer.is_valid():
         user = serializer.save()
+        if role in ['admin', 'developer', 'viewer']:
+            group = Group.objects.get(name=role)
+            user.groups.add(group)
         tokens = get_tokens_for_user(user)
         return Response({
             'user': {
