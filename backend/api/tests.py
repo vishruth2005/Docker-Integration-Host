@@ -1,3 +1,14 @@
-from django.test import TestCase
+# Import your model
+from .models import ContainerRecord
 
-# Create your tests here.
+# Get an existing DockerHost instance (or create a new one)
+container = ContainerRecord.objects.get(container_id='ddbfcf692f95')  # or filter by some field
+
+# Test connection
+success = container.start()
+
+print("Connection successful?" , success)
+print("Status:", container.status)
+
+# Save to persist status update
+container.save()

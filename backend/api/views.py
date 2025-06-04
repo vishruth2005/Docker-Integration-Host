@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import status
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer
-from .models import ContainerRecord
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer
+from .models import ContainerRecord, DockerHost
 from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 import docker
@@ -71,6 +71,34 @@ def get_tokens_for_user(user):
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def start_container(request, host_id,container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host=DockerHost.objects.get(id=host_id))
+        container.start()
+        return Response({"message": "Container started successfully."}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def connect_to_host(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id, owner=request.user)
+        is_connected = host.test_connection()
+        host.save()
+        if is_connected:
+            return Response({"message": "Host is reachable and connection is successful."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "Failed to connect to the Docker host."}, status=status.HTTP_400_BAD_REQUEST)
+    except DockerHost.DoesNotExist:
+        return Response({"message": "Docker host not found."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 def register_user(request):

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+import docker
 
 class CustomUser(AbstractUser):
     def __str__(self):
@@ -43,6 +44,16 @@ class ContainerRecord(models.Model):
     # Metadata
     last_updated = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
+
+    def start(self):
+        try:
+            client = docker.DockerClient(base_url=self.host.docker_api_url)
+            container = client.containers.get(self.container_id)
+            container.start()
+            self.status = 'running'
+            self.save()
+        except Exception as e:
+            raise Exception(f"Failed to start container: {e}")
 
     def __str__(self):
         return f"{self.name} ({self.container_id[:12]})"
@@ -98,6 +109,16 @@ class DockerHost(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def test_connection(self):
+        try:
+            client = docker.DockerClient(base_url=self.docker_api_url)
+            client.ping()
+            self.status = 'active'
+            return True
+        except Exception:
+            self.status = 'inactive'
+            return False
 
     def _str_(self):
         return f"{self.host_name} ({self.host_ip})"

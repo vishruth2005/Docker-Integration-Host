@@ -77,18 +77,6 @@ class DockerHostSerializer(serializers.ModelSerializer):
         if data['auth_type'] == 'tls' and not (data.get('tls_cert') and data.get('tls_key')):
             raise serializers.ValidationError("TLS certificate and key are required for TLS authentication")
         return data
-    
-    def test_connection(self):
-        try:
-            client = docker.DockerClient(base_url=f'{self.connection_protocol}://{self.host_ip}:{self.port}')
-            client.ping()
-            self.status = 'active'
-            self.save()
-            return True
-        except Exception as e:
-            self.status = 'inactive'
-            self.save()
-            return False
 
 class ContainerRecordSerializer(serializers.ModelSerializer):
     host = DockerHostSerializer(read_only=True)
