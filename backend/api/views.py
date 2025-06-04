@@ -4,9 +4,12 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import status
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer
+from .models import ContainerRecord
 from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
+import docker
+from django.db.models import Q
 
 def create_default_groups():
     for role in ['admin', 'developer', 'viewer']:
@@ -34,19 +37,30 @@ def root_view(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsAdmin])
 def admin_only_view(request):
-    return Response({"message": "Hello Admin!"})
+    containers = ContainerRecord.objects.all()
+    serializer = ContainerRecordSerializer(containers, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsDeveloper])
 def developer_only_view(request):
-    return Response({"message": "Hello Developer!"})
+    containers = ContainerRecord.objects.filter(
+        Q(created_by=request.user) |
+        Q(editable_by=request.user)
+    ).distinct()
+    serializer = ContainerRecordSerializer(containers, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsViewer])
 def viewer_only_view(request):
-    return Response({"message": "Hello Viewer!"})
+    containers = ContainerRecord.objects.filter(
+        Q(viewable_by=request.user)
+    ).distinct()
+    serializer = ContainerRecordSerializer(containers, many=True)
+    return Response(serializer.data)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
