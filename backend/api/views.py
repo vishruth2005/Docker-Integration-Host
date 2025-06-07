@@ -82,6 +82,39 @@ def start_container(request, host_id,container_id):
         return Response({"message": "Container started successfully."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def stop_container(request, host_id,container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host=DockerHost.objects.get(id=host_id))
+        container.stop()
+        return Response({"message": "Container stopped successfully."}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_container_logs(request, host_id,container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host=DockerHost.objects.get(id=host_id))
+        logs = container.get_logs()
+        return Response({"logs": logs.decode('utf-8')}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_container_stats(request, host_id, container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host=DockerHost.objects.get(id=host_id))
+        serializer = ContainerRecordSerializer(container)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])

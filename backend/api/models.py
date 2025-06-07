@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 import docker
+from rest_framework.response import Response
 
 class CustomUser(AbstractUser):
     def __str__(self):
@@ -54,6 +55,25 @@ class ContainerRecord(models.Model):
             self.save()
         except Exception as e:
             raise Exception(f"Failed to start container: {e}")
+        
+    def stop(self):
+        try:
+            client = docker.DockerClient(base_url=self.host.docker_api_url)
+            container = client.containers.get(self.container_id)
+            container.stop()
+            self.status = 'stopped'
+            self.save()
+        except Exception as e:
+            raise Exception(f"Failed to stop container: {e}")
+        
+    def get_logs(self):
+        try:
+            client = docker.DockerClient(base_url=self.host.docker_api_url)
+            container = client.containers.get(self.container_id)
+            logs = container.logs()
+            return logs
+        except Exception as e:
+            raise Exception(f"Failed to get logs: {e}")
 
     def __str__(self):
         return f"{self.name} ({self.container_id[:12]})"

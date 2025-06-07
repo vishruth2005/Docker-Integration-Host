@@ -5,10 +5,9 @@ from .models import ContainerRecord
 container = ContainerRecord.objects.get(container_id='ddbfcf692f95')  # or filter by some field
 
 # Test connection
-success = container.start()
+logs = container.get_logs()
 
-print("Connection successful?" , success)
-print("Status:", container.status)
+print("logs" , logs)
 
 # Save to persist status update
 container.save()
