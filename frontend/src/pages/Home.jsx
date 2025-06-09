@@ -13,8 +13,10 @@ function decodeToken(token) {
 }
 
 export default function Home() {
-  const [message, setMessage] = useState('');
+  const [containers, setContainers] = useState([]);
   const [role, setRole] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export default function Home() {
     else if (userRole === 'developer') endpoint = '/developer-only/';
     else if (userRole === 'viewer') endpoint = '/viewer-only/';
 
+    setLoading(true);
     fetch(`http://localhost:8000${endpoint}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -50,21 +53,65 @@ export default function Home() {
         }
         return res.json();
       })
-      .then(data => setMessage(data.message))
-      .catch(() => {
-        logout();
-        navigate('/login');
+      .then(data => {
+        setContainers(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError('Failed to fetch containers');
+        setLoading(false);
       });
   }, []);
 
+  const handleViewContainer = (container) => {
+    navigate(`${container.host.id}/${container.container_id}`);
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
   return (
     <div>
-      <h2>Home</h2>
-      <p><strong>Role:</strong> {role}</p>
-      <p>{message}</p>
-      <button onClick={() => { logout(); navigate('/login'); }}>
-        Logout
-      </button>
+      <div>
+        <h2>Home</h2>
+        <p><strong>Role:</strong> {role}</p>
+        <button onClick={() => { logout(); navigate('/login'); }}>
+          Logout
+        </button>  
+      </div>
+
+      <div>
+        <table style={{width: '60%'}}>
+          <thead>
+            <tr>
+              <th style={{textAlign: 'left'}}>Name</th>
+              <th style={{textAlign: 'left'}}>Image</th>
+              <th style={{textAlign: 'left'}}>Status</th>
+              <th style={{textAlign: 'left'}}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {containers.map((container) => (
+              <tr key={container.id}>
+                <td>
+                  <div>{container.name}</div>
+                  <div>{container.id}</div>
+                </td>
+                <td>{container.image}</td>
+                <td>
+                  <span>{container.status}</span>
+                </td>
+                <td>
+                  <button onClick={() => handleViewContainer(container)}>
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
+
   );
 }

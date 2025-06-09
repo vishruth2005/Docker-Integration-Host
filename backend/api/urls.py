@@ -14,5 +14,5 @@ urlpatterns = [
     path('<int:host_id>/<str:container_id>/logs/', get_container_logs, name='logs'),
     path('<int:host_id>/<str:container_id>/', get_container_stats, name='stats'),
     path('hosts/create/', create_host, name='create-host'),
-    path('hosts/<int:host_id>/containers/create/', create_container, name='create-container'),
+    path('<int:host_id>/containers/create/', create_container, name='create-container'),
 ]
