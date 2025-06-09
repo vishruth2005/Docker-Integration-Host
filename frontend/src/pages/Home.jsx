@@ -67,6 +67,14 @@ export default function Home() {
     navigate(`${container.host.id}/${container.container_id}`);
   };
 
+  const handleCreateHost = () => {
+    navigate(`hosts/create/`);
+  };
+
+  const handleCreateContainer = () => {
+    navigate(`${host_id}/containers/create/`);
+  };
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error}</div>;
 
@@ -77,7 +85,19 @@ export default function Home() {
         <p><strong>Role:</strong> {role}</p>
         <button onClick={() => { logout(); navigate('/login'); }}>
           Logout
-        </button>  
+        </button>
+
+        {(role === 'admin' || role === 'developer') && (
+          <>
+            <button onClick={handleCreateHost}>
+              Create Host
+            </button>
+            <button onClick={handleCreateContainer}>
+              Create Container
+            </button>
+          </>
+        )}
+        
       </div>
 
       <div>
