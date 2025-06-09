@@ -65,17 +65,23 @@ class DockerHostSerializer(serializers.ModelSerializer):
             'total_memory_mb', 'running_containers_count', 'total_images_count',
             'created_at', 'updated_at', 'labels'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'connection_protocol', 'status', 'host_ip', 'port']
+        read_only_fields = ['created_at', 'updated_at', 'connection_protocol', 'status']
 
     def create(self, validated_data):
-        user = self.context['request'].user
-        return DockerHost.objects.create(owner=user, **validated_data)
+        # user = self.context['request'].user
+        return DockerHost.objects.create(**validated_data)
 
     def validate(self, data):
-        if data['connection_protocol'] == 'tcp' and not data.get('port'):
+        connection_protocol = data.get('connection_protocol')
+        auth_type = data.get('auth_type')
+
+        if connection_protocol == 'tcp' and not data.get('port'):
             raise serializers.ValidationError("Port is required for TCP connections")
-        if data['auth_type'] == 'tls' and not (data.get('tls_cert') and data.get('tls_key')):
-            raise serializers.ValidationError("TLS certificate and key are required for TLS authentication")
+
+        if auth_type == 'tls':
+            if not data.get('tls_cert') or not data.get('tls_key'):
+                raise serializers.ValidationError("TLS certificate and key are required for TLS authentication")
+
         return data
 
 class ContainerRecordSerializer(serializers.ModelSerializer):

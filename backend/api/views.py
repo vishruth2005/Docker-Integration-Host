@@ -10,6 +10,8 @@ from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 import docker
 from django.db.models import Q
+from django.utils import timezone
+
 
 def create_default_groups():
     for role in ['admin', 'developer', 'viewer']:
@@ -132,6 +134,114 @@ def connect_to_host(request, host_id):
         return Response({"message": "Docker host not found."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_host(request):
+    serializer = DockerHostSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        try:
+            host = serializer.save(owner=request.user)
+            # Test connection to the host
+            is_connected = host.test_connection()
+            if is_connected:
+                return Response({
+                    'message': 'Docker host created successfully',
+                    'host': DockerHostSerializer(host).data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                host.delete()
+                return Response({
+                    'message': 'Could not connect to Docker host'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_container(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        
+        # Check permissions
+        if not (request.user.is_admin() or request.user == host.owner):
+            return Response({
+                'message': 'Permission denied'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # Required fields in request.data
+        required_fields = ['image', 'name']
+        if not all(field in request.data for field in required_fields):
+            return Response({
+                'message': 'Missing required fields'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create container record
+        container_data = {
+            'container_id': '',  
+            'name': request.data['name'],
+            'image': request.data['image'],
+            'status': 'creating',
+            'created_at': timezone.now(),
+            'host': host,
+            'created_by': request.user
+        }
+
+        # Optional configuration
+        container_config = {
+            'name': request.data['name'],
+            'image': request.data['image'],
+            'ports': request.data.get('ports', {}),
+            'environment': request.data.get('environment', {}),
+            'volumes': request.data.get('volumes', []),
+            'command': request.data.get('command', None)
+        }
+
+        try:
+            # Create container in Docker
+            client = docker.DockerClient(base_url=f"{host.docker_api_url}")
+            docker_container = client.containers.create(**container_config)
+            
+            # Update container record with actual container ID
+            container_data['container_id'] = docker_container.id
+            container_data['status'] = 'created'
+            
+            # Save container record
+            container = ContainerRecord.objects.create(**container_data)
+            
+            # Add permissions
+            if 'viewable_by' in request.data:
+                container.viewable_by.add(*request.data['viewable_by'])
+            if 'editable_by' in request.data:
+                container.editable_by.add(*request.data['editable_by'])
+
+            # Start container if requested
+            if request.data.get('start', False):
+                docker_container.start()
+                container.status = 'running'
+                container.save()
+
+            serializer = ContainerRecordSerializer(container)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except docker.errors.APIError as e:
+            return Response({
+                'message': f'Docker API error: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'message': f'Error creating container: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    except DockerHost.DoesNotExist:
+        return Response({
+            'message': 'Docker host not found'
+        }, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['POST'])
 def register_user(request):

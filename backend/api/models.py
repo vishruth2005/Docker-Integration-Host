@@ -130,6 +130,15 @@ class DockerHost(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ('owner', 'host_ip', 'port')
+
+    def save(self, *args, **kwargs):
+        # Auto-generate docker_api_url if not provided
+        if not self.docker_api_url and self.host_ip and self.port:
+            self.docker_api_url = f"{self.connection_protocol}://{self.host_ip}:{self.port}"
+        super().save(*args, **kwargs)
+
     def test_connection(self):
         try:
             client = docker.DockerClient(base_url=self.docker_api_url)
