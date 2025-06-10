@@ -161,29 +161,48 @@ def create_host(request):
             }, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_user_docker_hosts(request):
+    user_hosts = DockerHost.objects.filter(owner=request.user)
+    serializer = DockerHostSerializer(user_hosts, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def create_container(request, host_id):
+def create_container(request):
     try:
-        host = DockerHost.objects.get(id=host_id)
-        
+        host_id = request.data.get('host_id')
+        if not host_id:
+            return Response({
+                'message': 'host_id is required in the request data'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            host = DockerHost.objects.get(id=host_id)
+        except DockerHost.DoesNotExist:
+            return Response({
+                'message': 'Docker host not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
         # Check permissions
         if not (request.user.is_admin() or request.user == host.owner):
             return Response({
                 'message': 'Permission denied'
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # Required fields in request.data
+        # Required fields
         required_fields = ['image', 'name']
         if not all(field in request.data for field in required_fields):
             return Response({
-                'message': 'Missing required fields'
+                'message': 'Missing required fields: image and name are required'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Create container record
         container_data = {
-            'container_id': '',  
+            'container_id': '',
             'name': request.data['name'],
             'image': request.data['image'],
             'status': 'creating',
@@ -192,7 +211,7 @@ def create_container(request, host_id):
             'created_by': request.user
         }
 
-        # Optional configuration
+        # Optional Docker configuration
         container_config = {
             'name': request.data['name'],
             'image': request.data['image'],
@@ -206,14 +225,14 @@ def create_container(request, host_id):
             # Create container in Docker
             client = docker.DockerClient(base_url=f"{host.docker_api_url}")
             docker_container = client.containers.create(**container_config)
-            
+
             # Update container record with actual container ID
             container_data['container_id'] = docker_container.id
             container_data['status'] = 'created'
-            
+
             # Save container record
             container = ContainerRecord.objects.create(**container_data)
-            
+
             # Add permissions
             if 'viewable_by' in request.data:
                 container.viewable_by.add(*request.data['viewable_by'])
@@ -238,10 +257,11 @@ def create_container(request, host_id):
                 'message': f'Error creating container: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    except DockerHost.DoesNotExist:
+    except Exception as e:
         return Response({
-            'message': 'Docker host not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+            'message': f'Unexpected error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 def register_user(request):

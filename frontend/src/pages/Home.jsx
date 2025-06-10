@@ -72,7 +72,7 @@ export default function Home() {
   };
 
   const handleCreateContainer = () => {
-    navigate(`${host_id}/containers/create/`);
+    navigate(`containers/create/`);
   };
 
   if (loading) return <div>Loading...</div>;
