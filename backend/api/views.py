@@ -397,3 +397,80 @@ def delete_network(request, network_id):
 
     except Exception as e:
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def connect_container_to_network(request):
+    try:
+        network_id = request.data.get('network_id')
+        container_id = request.data.get('container_id')
+
+        if not network_id or not container_id:
+            return Response({'message': 'network_id and container_id are required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve the Network and Container from DB
+        network = Network.objects.get(id=network_id)
+        container = ContainerRecord.objects.get(container_id=container_id)
+
+        # Ensure both belong to the same host
+        if network.host != container.host:
+            return Response({'message': 'Container and network must belong to the same host.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Connect to Docker host
+        client = docker.DockerClient(base_url=network.host.docker_api_url)
+
+        # Get Docker objects
+        docker_network = client.networks.get(network_id)
+        docker_container = client.containers.get(container_id)
+
+        # Connect container to network
+        docker_network.connect(docker_container)
+
+        return Response({'message': f'Container {container.name} connected to network {network.name} successfully.'},
+                        status=status.HTTP_200_OK)
+
+    except Network.DoesNotExist:
+        return Response({'message': 'Network not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except ContainerRecord.DoesNotExist:
+        return Response({'message': 'Container not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def disconnect_container_from_network(request):
+    try:
+        network_id = request.data.get('network_id')
+        container_id = request.data.get('container_id')
+
+        if not network_id or not container_id:
+            return Response({'message': 'network_id and container_id are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Retrieve network and container
+        network = Network.objects.get(id=network_id)
+        container = ContainerRecord.objects.get(container_id=container_id)
+        host = network.host
+
+        # Connect to Docker host
+        client = docker.DockerClient(base_url=host.docker_api_url)
+
+        # Get Docker network and disconnect container
+        docker_network = client.networks.get(network_id)
+        docker_network.disconnect(container_id, force=True)
+
+        return Response({'message': f'Container {container.name} disconnected from network {network.name}'}, status=status.HTTP_200_OK)
+
+    except Network.DoesNotExist:
+        return Response({'message': 'Network not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ContainerRecord.DoesNotExist:
+        return Response({'message': 'Container not found'}, status=status.HTTP_404_NOT_FOUND)
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
