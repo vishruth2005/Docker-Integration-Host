@@ -205,3 +205,25 @@ class DockerHost(models.Model):
 
     def _str_(self):
         return f"{self.host_name} ({self.host_ip})"
+    
+class Network(models.Model):
+    NETWORK_DRIVER_CHOICES = [
+        ('bridge', 'Bridge'),
+        ('overlay', 'Overlay'),
+        ('host', 'Host'),
+        ('macvlan', 'Macvlan'),
+        ('none', 'None'),
+    ]
+
+    id = models.CharField(primary_key=True, max_length=64)  # Docker network ID
+    name = models.CharField(max_length=100, unique=True)
+    driver = models.CharField(max_length=20, choices=NETWORK_DRIVER_CHOICES, default='bridge')
+    scope = models.CharField(max_length=50, default='local')
+    created_at = models.DateTimeField(auto_now_add=True)
+    internal = models.BooleanField(default=False)
+    attachable = models.BooleanField(default=False)
+    ingress = models.BooleanField(default=False)
+    host = models.ForeignKey(DockerHost, on_delete=models.CASCADE, related_name='networks')
+
+    def __str__(self):
+        return f"{self.name} ({self.driver})"

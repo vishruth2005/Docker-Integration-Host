@@ -4,13 +4,14 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import status
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer
-from .models import ContainerRecord, DockerHost
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer, NetworkSerializer
+from .models import ContainerRecord, DockerHost, Network
 from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 import docker
 from django.db.models import Q
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 
 
 def create_default_groups():
@@ -312,3 +313,87 @@ def login_user(request):
             'message': 'Login successful'
         }, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_network(request):
+    serializer = NetworkSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        try:
+            # Extract the Docker host from validated data
+            host = serializer.validated_data['host']
+
+            # Connect to the Docker engine on that host
+            client = docker.DockerClient(base_url=host.docker_api_url)
+
+            # Create the Docker network via SDK
+            docker_network = client.networks.create(
+                name=serializer.validated_data['name'],
+                driver=serializer.validated_data['driver'],
+                internal=serializer.validated_data.get('internal', False),
+                attachable=serializer.validated_data.get('attachable', False),
+                ingress=serializer.validated_data.get('ingress', False),
+                scope=serializer.validated_data.get('scope', 'local')
+            )
+
+            # Save the network instance manually using the Docker network ID as the primary key
+            network_instance = Network.objects.create(
+                id=docker_network.id,  # <-- IMPORTANT: this is your primary key
+                name=serializer.validated_data['name'],
+                driver=serializer.validated_data['driver'],
+                scope=serializer.validated_data.get('scope', 'local'),
+                internal=serializer.validated_data.get('internal', False),
+                attachable=serializer.validated_data.get('attachable', False),
+                ingress=serializer.validated_data.get('ingress', False),
+                host=host
+            )
+
+            return Response({
+                'message': 'Docker network created successfully',
+                'network': NetworkSerializer(network_instance).data
+            }, status=status.HTTP_201_CREATED)
+
+        except docker.errors.APIError as e:
+            return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_network(request, network_id):
+    try:
+        # Get the Network object from the database
+        network = Network.objects.get(id=network_id)
+
+        # Connect to the Docker host where the network exists
+        client = docker.DockerClient(base_url=network.host.docker_api_url)
+
+        # Get the network object from Docker
+        docker_network = client.networks.get(network_id)
+
+        # Remove the network via Docker SDK
+        docker_network.remove()
+
+        # Delete from DB
+        network.delete()
+
+        return Response({'message': 'Docker network deleted successfully.'}, status=status.HTTP_200_OK)
+
+    except Network.DoesNotExist:
+        return Response({'message': 'Network not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    except docker.errors.NotFound:
+        network.delete()  # Clean DB if network exists in DB but not in Docker
+        return Response({'message': 'Docker network not found. Removed from DB.'}, status=status.HTTP_200_OK)
+
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)

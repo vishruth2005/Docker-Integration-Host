@@ -4,7 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import docker
 
-from api.models import ContainerRecord, DockerHost
+from api.models import ContainerRecord, DockerHost, Network
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -124,3 +124,27 @@ class ContainerRecordSerializer(serializers.ModelSerializer):
 
     def get_viewable_by(self, obj):
         return [user.username for user in obj.viewable_by.all()]
+    
+class NetworkSerializer(serializers.ModelSerializer):
+    host = DockerHostSerializer(read_only=True)
+    host_id = serializers.PrimaryKeyRelatedField(
+        queryset=DockerHost.objects.all(),
+        source='host',
+        write_only=True
+    )
+
+    class Meta:
+        model = Network
+        fields = [
+            'id',
+            'name',
+            'driver',
+            'scope',
+            'internal',
+            'attachable',
+            'ingress',
+            'created_at',
+            'host',
+            'host_id'
+        ]
+        read_only_fields = ['id', 'created_at', 'host']
