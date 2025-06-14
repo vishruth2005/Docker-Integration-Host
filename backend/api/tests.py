@@ -5,9 +5,6 @@ from .models import ContainerRecord
 container = ContainerRecord.objects.get(container_id='ddbfcf692f95')  # or filter by some field
 
 # Test connection
-logs = container.get_logs()
+stats = container.stats()
 
-print("logs" , logs)
-
-# Save to persist status update
-container.save()
+print("stats" , stats)

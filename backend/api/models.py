@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 import docker
 from rest_framework.response import Response
+import time
 
 class CustomUser(AbstractUser):
     def __str__(self):
@@ -74,6 +75,59 @@ class ContainerRecord(models.Model):
             return logs
         except Exception as e:
             raise Exception(f"Failed to get logs: {e}")
+
+    def stats(self, stream=False):
+        try:
+            import docker
+            client = docker.DockerClient(base_url=self.host.docker_api_url)
+            container = client.containers.get(self.container_id)
+
+            # Always stream once to get valid stats
+            raw_stats = container.stats(stream=stream)
+
+            if raw_stats["read"].startswith("0001-01-01"):
+                raise Exception("Container stats not ready or container is not running.")
+
+            # === CPU TIME (user + kernel) ===
+            cpu_stats = raw_stats["cpu_stats"]
+            cpu_user = cpu_stats["cpu_usage"]["usage_in_usermode"]
+            cpu_kernel = cpu_stats["cpu_usage"]["usage_in_kernelmode"]
+            cpu_total_time_sec = (cpu_user + cpu_kernel) / 1e9  # Convert nanoseconds to seconds
+
+            # === MEMORY ===
+            mem_usage = raw_stats["memory_stats"]["usage"]
+            mem_limit = raw_stats["memory_stats"]["limit"]
+
+            # === NETWORK ===
+            net = raw_stats["networks"]["eth0"]
+            rx_bytes = net["rx_bytes"]
+            tx_bytes = net["tx_bytes"]
+            network_rx_mb = round(rx_bytes / (1024 ** 2), 2)
+            network_tx_mb = round(tx_bytes / (1024 ** 2), 2)
+
+            # === PIDs ===
+            pids = raw_stats["pids_stats"]["current"]
+
+            # === Final Structured Result ===
+            result = {
+                "container_id": raw_stats["id"][:12],
+                "name": raw_stats["name"].lstrip("/"),
+                "cpu_total_time_sec": round(cpu_total_time_sec, 2),
+                "memory_usage_mb": round(mem_usage / (1024 ** 2), 2),
+                "memory_limit_mb": round(mem_limit / (1024 ** 2), 2),
+                "pids": pids,
+                "network_rx_mb": network_rx_mb,
+                "network_tx_mb": network_tx_mb,
+                "timestamp": raw_stats["read"]
+            }
+
+            return result
+
+        except KeyError as ke:
+            raise Exception(f"Missing expected stat field: {ke}")
+        except Exception as e:
+            raise Exception(f"Failed to get stats: {e}")
+
 
     def __str__(self):
         return f"{self.name} ({self.container_id[:12]})"

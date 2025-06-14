@@ -9,6 +9,8 @@ export default function ContainerDetail() {
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState('');
   const [showLogs, setShowLogs] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [showStats, setShowStats] = useState(false);
   const navigate = useNavigate();
 
   const fetchContainerDetails = () => {
@@ -94,6 +96,30 @@ export default function ContainerDetail() {
     }
   };
 
+  const handleViewStats = async () => {
+    const token = getAccessToken();
+
+    try {
+      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/stats/`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (res.status === 200) {
+        setStats(data);
+        setShowStats(true);
+      } else {
+        throw new Error(data.message || 'Failed to fetch stats');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   if (error) return <p>Error: {error}</p>;
   if (!container) return <p>Loading container details...</p>;
 
@@ -118,9 +144,14 @@ export default function ContainerDetail() {
       <p><strong>Is Active:</strong> {container.is_active ? 'Yes' : 'No'}</p>
 
       {container.status === 'running' ? (
-        <button onClick={() => handleAction('stop')} style={{ marginTop: '10px', marginRight: '10px' }}>
-          Stop Container
-        </button>
+        <>
+          <button onClick={() => handleAction('stop')} style={{ marginTop: '10px', marginRight: '10px' }}>
+            Stop Container
+          </button>
+          <button onClick={handleViewStats} style={{ marginTop: '10px', marginRight: '10px' }}>
+            View Stats
+          </button>
+        </>
       ) : (
         <button onClick={() => handleAction('start')} style={{ marginTop: '10px', marginRight: '10px' }}>
           Start Container
@@ -135,6 +166,18 @@ export default function ContainerDetail() {
         <div style={{ marginTop: '20px', whiteSpace: 'pre-wrap', background: '#f4f4f4', padding: '10px', borderRadius: '5px' }}>
           <h3>Logs:</h3>
           <code>{logs}</code>
+        </div>
+      )}
+
+      {showStats && stats && (
+        <div style={{ marginTop: '20px', background: '#eef', padding: '10px', borderRadius: '5px' }}>
+          <h3>Container Stats</h3>
+          <p><strong>CPU Time Used:</strong> {stats.cpu_total_time_sec} sec</p>
+          <p><strong>Memory Usage:</strong> {stats.memory_usage_mb} MB / {stats.memory_limit_mb} MB</p>
+          <p><strong>Processes (PIDs):</strong> {stats.pids}</p>
+          <p><strong>Network RX:</strong> {stats.network_rx_mb} MB</p>
+          <p><strong>Network TX:</strong> {stats.network_tx_mb} MB</p>
+          <p><strong>Timestamp:</strong> {new Date(stats.timestamp).toLocaleString()}</p>
         </div>
       )}
     </div>
