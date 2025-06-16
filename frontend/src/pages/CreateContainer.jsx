@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getAccessToken } from '../utils/auth';
 
 export default function CreateContainer() {
   const navigate = useNavigate();
-  const [hosts, setHosts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { host_id } = useParams();
 
   const [formData, setFormData] = useState({
-    host_id: '',
     name: '',
     image: '',
     ports: {},
@@ -21,38 +19,6 @@ export default function CreateContainer() {
     start: false
   });
 
-  // Fetch available hosts when component mounts
-  useEffect(() => {
-    const fetchHosts = async () => {
-      const token = getAccessToken();
-      try {
-        const response = await fetch('http://localhost:8000/docker-hosts/my/', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.status === 401) {
-          navigate('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch hosts');
-        }
-
-        const data = await response.json();
-        setHosts(data);
-      } catch (err) {
-        setError('Failed to load Docker hosts');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHosts();
-  }, [navigate]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -61,7 +27,7 @@ export default function CreateContainer() {
 
     try {
       const token = getAccessToken();
-      const response = await fetch('http://localhost:8000/containers/create/', {
+      const response = await fetch(`http://localhost:8000/hosts/${host_id}/containers/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,8 +51,6 @@ export default function CreateContainer() {
     }
   };
 
-  if (loading) return <div>Loading available hosts...</div>;
-
   return (
     <div>
       <h2>Create Container</h2>
@@ -96,20 +60,6 @@ export default function CreateContainer() {
       {success && ( <div> {success} </div> )}
 
       <form onSubmit={handleSubmit} >
-        <div>
-          <label>Select Host</label>
-          <select
-            value={formData.host_id}
-            onChange={(e) => setFormData({ ...formData, host_id: e.target.value })}
-            required
-          >
-            <option value="">Select a Docker host</option>
-            {hosts.map((host) => (
-              <option key={host.id} value={host.id}> {host.host_name} </option>
-            ))}
-          </select>
-        </div>
-
         <div>
           <label>Container Name</label>
           <input

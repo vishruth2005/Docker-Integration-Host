@@ -40,29 +40,27 @@ def root_view(request):
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsAdmin])
 def admin_only_view(request):
-    containers = ContainerRecord.objects.all()
-    serializer = ContainerRecordSerializer(containers, many=True)
+    # Admin can see all hosts
+    hosts = DockerHost.objects.all()
+    serializer = DockerHostSerializer(hosts, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsDeveloper])
 def developer_only_view(request):
-    containers = ContainerRecord.objects.filter(
-        Q(created_by=request.user) |
-        Q(editable_by=request.user)
-    ).distinct()
-    serializer = ContainerRecordSerializer(containers, many=True)
+    # Developer can see hosts they own
+    hosts = DockerHost.objects.filter(owner=request.user)
+    serializer = DockerHostSerializer(hosts, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated, IsViewer])
 def viewer_only_view(request):
-    containers = ContainerRecord.objects.filter(
-        Q(viewable_by=request.user)
-    ).distinct()
-    serializer = ContainerRecordSerializer(containers, many=True)
+    # Viewer can see hosts they own
+    hosts = DockerHost.objects.filter(owner=request.user)
+    serializer = DockerHostSerializer(hosts, many=True)
     return Response(serializer.data)
 
 def get_tokens_for_user(user):
@@ -173,48 +171,29 @@ def create_host(request):
             }, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
-def get_user_docker_hosts(request):
-    user_hosts = DockerHost.objects.filter(owner=request.user)
-    serializer = DockerHostSerializer(user_hosts, many=True)
-    return Response(serializer.data, status=status.HTTP_200_OK)
-
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])
-def create_container(request):
+def create_container(request, host_id):
     try:
-        host_id = request.data.get('host_id')
-        if not host_id:
-            return Response({
-                'message': 'host_id is required in the request data'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            host = DockerHost.objects.get(id=host_id)
-        except DockerHost.DoesNotExist:
-            return Response({
-                'message': 'Docker host not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-
+        host = DockerHost.objects.get(id=host_id)
+        
         # Check permissions
         if not (request.user.is_admin() or request.user == host.owner):
             return Response({
                 'message': 'Permission denied'
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # Required fields
+        # Required fields in request.data
         required_fields = ['image', 'name']
         if not all(field in request.data for field in required_fields):
             return Response({
-                'message': 'Missing required fields: image and name are required'
+                'message': 'Missing required fields'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Create container record
         container_data = {
-            'container_id': '',
+            'container_id': '',  
             'name': request.data['name'],
             'image': request.data['image'],
             'status': 'creating',
@@ -223,7 +202,7 @@ def create_container(request):
             'created_by': request.user
         }
 
-        # Optional Docker configuration
+        # Optional configuration
         container_config = {
             'name': request.data['name'],
             'image': request.data['image'],
@@ -237,14 +216,14 @@ def create_container(request):
             # Create container in Docker
             client = docker.DockerClient(base_url=f"{host.docker_api_url}")
             docker_container = client.containers.create(**container_config)
-
+            
             # Update container record with actual container ID
             container_data['container_id'] = docker_container.id
             container_data['status'] = 'created'
-
+            
             # Save container record
             container = ContainerRecord.objects.create(**container_data)
-
+            
             # Add permissions
             if 'viewable_by' in request.data:
                 container.viewable_by.add(*request.data['viewable_by'])
@@ -269,11 +248,51 @@ def create_container(request):
                 'message': f'Error creating container: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    except DockerHost.DoesNotExist:
+        return Response({
+            'message': 'Docker host not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def host_detail_view(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        host_serializer = DockerHostSerializer(host)
+        
+        # Get containers based on user role and permissions
+        if request.user.groups.filter(name='admin').exists():
+            containers = ContainerRecord.objects.filter(host=host)
+        elif request.user.groups.filter(name='developer').exists():
+            containers = ContainerRecord.objects.filter(
+                host=host
+            ).filter(
+                Q(created_by=request.user) |
+                Q(editable_by=request.user)
+            ).distinct()
+        else:
+            containers = ContainerRecord.objects.filter(
+                host=host
+            ).filter(
+                Q(viewable_by=request.user)
+            ).distinct()
+
+        container_serializer = ContainerRecordSerializer(containers, many=True)
+
+        return Response({
+            'host': host_serializer.data,
+            'containers': container_serializer.data
+        }, status=status.HTTP_200_OK)
+
+    except DockerHost.DoesNotExist:
+        return Response({
+            'message': 'Host not found'
+        }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({
-            'message': f'Unexpected error: {str(e)}'
+            'message': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 @api_view(['POST'])
 def register_user(request):
@@ -360,8 +379,6 @@ def create_network(request):
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 
 @api_view(['DELETE'])
 @authentication_classes([JWTAuthentication])

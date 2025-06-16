@@ -13,7 +13,7 @@ function decodeToken(token) {
 }
 
 export default function Home() {
-  const [containers, setContainers] = useState([]);
+  const [hosts, setHosts] = useState([]);
   const [role, setRole] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,17 +54,17 @@ export default function Home() {
         return res.json();
       })
       .then(data => {
-        setContainers(data);
+        setHosts(data);
         setLoading(false);
       })
       .catch((err) => {
-        setError('Failed to fetch containers');
+        setError('Failed to fetch hosts');
         setLoading(false);
       });
   }, []);
 
-  const handleViewContainer = (container) => {
-    navigate(`${container.host.id}/${container.container_id}`);
+  const handleViewHost = (host) => {
+    navigate(`/${host.id}/containers`);
   };
 
   const handleCreateHost = () => {
@@ -87,44 +87,44 @@ export default function Home() {
           Logout
         </button>
 
+        <h2>Docker Hosts</h2>
         {(role === 'admin' || role === 'developer') && (
           <>
             <button onClick={handleCreateHost}>
               Create Host
             </button>
-            <button onClick={handleCreateContainer}>
-              Create Container
-            </button>
           </>
         )}
-        
       </div>
 
       <div>
         <table style={{width: '60%'}}>
           <thead>
             <tr>
-              <th style={{textAlign: 'left'}}>Name</th>
-              <th style={{textAlign: 'left'}}>Image</th>
+              <th style={{textAlign: 'left'}}>Host Name</th>
+              <th style={{textAlign: 'left'}}>IP Address</th>
               <th style={{textAlign: 'left'}}>Status</th>
               <th style={{textAlign: 'left'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {containers.map((container) => (
-              <tr key={container.id}>
+            {hosts.map((host) => (
+              <tr key={host.id}>
                 <td>
-                  <div>{container.name}</div>
-                  <div>{container.id}</div>
+                  <div>{host.host_name}</div>
+                  <div>{host.description}</div>
                 </td>
-                <td>{container.image}</td>
+                <td>{host.host_ip}</td>
+                <td>{host.status}</td>
                 <td>
-                  <span>{container.status}</span>
-                </td>
-                <td>
-                  <button onClick={() => handleViewContainer(container)}>
-                    View Details
+                  <button onClick={() => navigate(`/hosts/${host.id}/containers`)}>
+                    View Containers
                   </button>
+                  {(role === 'admin' || role === 'developer') && (
+                    <button onClick={() => navigate(`/hosts/${host.id}/containers/create`)}>
+                      Create Container
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -132,6 +132,5 @@ export default function Home() {
         </table>
       </div>
     </div>
-
   );
 }

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import viewer_only_view, developer_only_view, admin_only_view, register_user, login_user, root_view, connect_to_host, start_container, stop_container, get_container_logs, get_container_details,create_host, create_container, get_user_docker_hosts, get_container_stats, create_network, delete_network, connect_container_to_network, disconnect_container_from_network
+from .views import viewer_only_view, developer_only_view, admin_only_view, register_user, login_user, root_view, connect_to_host, start_container, stop_container, get_container_logs, get_container_details,create_host, create_container, get_container_stats, create_network, delete_network, connect_container_to_network, disconnect_container_from_network, host_detail_view
 
 urlpatterns = [
     path('viewer-only/', viewer_only_view, name='viewer'),
@@ -15,10 +15,10 @@ urlpatterns = [
     path('<int:host_id>/<str:container_id>/', get_container_details, name='details'),
     path('<int:host_id>/<str:container_id>/stats/', get_container_stats, name='stats'),
     path('hosts/create/', create_host, name='create-host'),
-    path('containers/create/', create_container, name='create-container'),
-    path('docker-hosts/my/', get_user_docker_hosts, name='user-docker-hosts'),
+    path('hosts/<int:host_id>/containers/', host_detail_view, name='view-containers'), 
+    path('hosts/<int:host_id>/containers/create/', create_container, name='create-container'),
     path('networks/create/', create_network, name='create-network'),
-    path('networks/<str:network_id>/delete/', delete_network, name='delete_network'),
-    path('networks/connect/', connect_container_to_network, name='connect_container_to_network'),
+    path('networks/<str:network_id>/delete/', delete_network, name='delete-network'),
+    path('networks/connect/', connect_container_to_network, name='connect-container-to-network'),
     path('networks/disconnect/', disconnect_container_from_network, name='disconnect-container'),
 ]
