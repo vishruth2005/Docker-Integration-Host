@@ -11,31 +11,56 @@ export default function ContainerDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [stats, setStats] = useState(null);
   const [showStats, setShowStats] = useState(false);
+  const [allNetworks, setAllNetworks] = useState([]);
+  const [connectedNetworks, setConnectedNetworks] = useState([]);
+  const [selectedNetwork, setSelectedNetwork] = useState('');
   const navigate = useNavigate();
 
-  const fetchContainerDetails = () => {
+  const fetchContainerDetails = async () => {
     const token = getAccessToken();
-    fetch(`http://localhost:8000/${host_id}/${container_id}/`, {
-      headers: {
-        Authorization: `Bearer ${token}`
+    try {
+      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        logout();
+        navigate('/login');
+        return;
       }
-    })
-      .then(res => {
-        if (res.status === 401) {
-          logout();
-          navigate('/login');
-        }
-        if (!res.ok) {
-          throw new Error('Container not found');
-        }
-        return res.json();
-      })
-      .then(data => {
-        setContainer(data);
-        setError('');
-      })
-      .catch(err => setError(err.message));
+      if (!res.ok) throw new Error('Container not found');
+      const data = await res.json();
+      setContainer(data);
+    } catch (err) {
+      setError(err.message);
+    }
   };
+
+  const fetchNetworks = async () => {
+    const token = getAccessToken();
+    try {
+      // Get connected networks
+      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/networks/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      const connectedData = await res.json();
+      setConnectedNetworks(connectedData);
+  
+      // Get all available networks
+      const allRes = await fetch(`http://localhost:8000/hosts/${host_id}/networks/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allData = await allRes.json();
+      setAllNetworks(allData);
+    } catch (err) {
+      setError('Failed to fetch networks');
+    }
+  };
+  
 
   useEffect(() => {
     const token = getAccessToken();
@@ -43,27 +68,22 @@ export default function ContainerDetail() {
       navigate('/login');
       return;
     }
-
     fetchContainerDetails();
+    fetchNetworks();
   }, [container_id, navigate]);
 
   const handleAction = async (action) => {
     const token = getAccessToken();
     const endpoint = action === 'start' ? 'start' : 'stop';
-
     try {
       const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/${endpoint}/`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await res.json();
-
       if (res.status === 200) {
         setMessage(data.message);
-        fetchContainerDetails(); // Refresh container details
+        fetchContainerDetails();
       } else {
         throw new Error(data.message || 'Action failed');
       }
@@ -74,17 +94,12 @@ export default function ContainerDetail() {
 
   const handleViewLogs = async () => {
     const token = getAccessToken();
-
     try {
       const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/logs/`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await res.json();
-
       if (res.status === 200) {
         setLogs(data.logs || 'No logs available.');
         setShowLogs(true);
@@ -98,17 +113,11 @@ export default function ContainerDetail() {
 
   const handleViewStats = async () => {
     const token = getAccessToken();
-
     try {
       const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/stats/`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await res.json();
-
       if (res.status === 200) {
         setStats(data);
         setShowStats(true);
@@ -120,8 +129,68 @@ export default function ContainerDetail() {
     }
   };
 
+  const handleConnectNetwork = async () => {
+    const token = getAccessToken();
+    try {
+      const res = await fetch('http://localhost:8000/networks/connect/', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          container_id: container.container_id,
+          network_id: selectedNetwork
+        })
+      });
+
+      const data = await res.json();
+      if (res.status === 200) {
+        setMessage(data.message);
+        setSelectedNetwork('');
+        fetchNetworks(); // Refresh connected and all networks
+      } else {
+        throw new Error(data.message || 'Failed to connect to network');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDisconnectNetwork = async (networkId) => {
+    const token = getAccessToken();
+    try {
+      const res = await fetch('http://localhost:8000/networks/disconnect/', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          container_id: container.container_id,
+          network_id: networkId
+        })
+      });
+  
+      const data = await res.json();
+      if (res.status === 200) {
+        setMessage(data.message);
+        fetchNetworks(); // Refresh network list
+      } else {
+        throw new Error(data.message || 'Failed to disconnect from network');
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  
+
   if (error) return <p>Error: {error}</p>;
   if (!container) return <p>Loading container details...</p>;
+
+  const unconnectedNetworks = allNetworks.filter(
+    net => !connectedNetworks.some(cn => cn.name === net.name) // Using 'name' to compare
+  );
 
   return (
     <div>
@@ -137,11 +206,60 @@ export default function ContainerDetail() {
       <p><strong>Internal Ports:</strong> {container.internal_ports}</p>
       <p><strong>Port Bindings:</strong> {container.port_bindings}</p>
       <p><strong>Host:</strong> {container.host?.name || 'N/A'}</p>
-      <p><strong>Created By:</strong> {container.created_by}</p>
-      <p><strong>Editable By:</strong> {Array.isArray(container.editable_by) ? container.editable_by.join(', ') : 'N/A'}</p>
-      <p><strong>Viewable By:</strong> {Array.isArray(container.viewable_by) ? container.viewable_by.join(', ') : 'N/A'}</p>
-      <p><strong>Last Updated:</strong> {container.last_updated}</p>
-      <p><strong>Is Active:</strong> {container.is_active ? 'Yes' : 'No'}</p>
+
+      <div style={{ marginTop: '20px' }}>
+        <h4>Connected Networks:</h4>
+        {connectedNetworks.length > 0 ? (
+          <ul>
+            {connectedNetworks.map(net => (
+              <li key={net.name} style={{ marginBottom: '8px' }}>
+                {net.name}
+                <button
+                  onClick={() => handleDisconnectNetwork(net.id)}
+                  style={{
+                    marginLeft: '10px',
+                    padding: '2px 8px',
+                    backgroundColor: '#f55',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Disconnect
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Not connected to any network.</p>
+        )}
+      </div>
+
+
+      <div style={{ marginTop: '20px' }}>
+        <h4>Connect to a Network</h4>
+        {unconnectedNetworks.length === 0 ? (
+          <p>All networks are already connected.</p>
+        ) : (
+          <>
+            <select value={selectedNetwork} onChange={e => setSelectedNetwork(e.target.value)}>
+              <option value="">Select a network</option>
+              {unconnectedNetworks.map(net => (
+                <option key={net.name} value={net.id}>{net.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleConnectNetwork}
+              disabled={!selectedNetwork}
+              style={{ marginLeft: '10px' }}
+            >
+              Connect
+            </button>
+          </>
+        )}
+      </div>
+
 
       {container.status === 'running' ? (
         <>

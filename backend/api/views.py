@@ -505,3 +505,46 @@ def get_networks_by_host(request, host_id):
     networks = Network.objects.filter(host=host)
     serializer = NetworkSerializer(networks, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def container_connected_networks(request, host_id, container_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        container_record = ContainerRecord.objects.get(container_id=container_id)
+
+        if container_record.host != host:
+            return Response({'message': 'Container does not belong to the given host.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        client = docker.DockerClient(base_url=host.docker_api_url)
+        container = client.containers.get(container_id)
+
+        networks = container.attrs['NetworkSettings']['Networks']
+        connected_networks = []
+        for name in networks.keys():
+            try:
+                network = client.networks.get(name)
+                connected_networks.append({
+                    'id': network.id,
+                    'name': name,
+                    'details': networks[name]
+                })
+            except docker.errors.NotFound:
+                connected_networks.append({
+                    'id': None,
+                    'name': name,
+                    'details': networks[name]
+                })
+
+        return Response(connected_networks, status=status.HTTP_200_OK)
+
+    except DockerHost.DoesNotExist:
+        return Response({'message': 'Host not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except ContainerRecord.DoesNotExist:
+        return Response({'message': 'Container not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
