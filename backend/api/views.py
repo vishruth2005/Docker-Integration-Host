@@ -378,6 +378,7 @@ def create_network(request):
         except Exception as e:
             return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     else:
+        print(serializer.errors)  # Debugging line to check validation errors
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
@@ -491,3 +492,16 @@ def disconnect_container_from_network(request):
         return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_networks_by_host(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+    except DockerHost.DoesNotExist:
+        return Response({'message': 'Host not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    networks = Network.objects.filter(host=host)
+    serializer = NetworkSerializer(networks, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

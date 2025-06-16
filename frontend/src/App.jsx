@@ -7,6 +7,8 @@ import ContainerDetail from './pages/ContainerDetail';
 import CreateHost from './pages/CreateHost';
 import CreateContainer from './pages/CreateContainer';
 import HostDetail from './pages/HostDetail';
+import CreateNetwork from './pages/CreateNetwork';
+import ManageNetworks from './pages/ManageNetworks';
 
 function App() {
   return (
@@ -19,6 +21,8 @@ function App() {
         <Route path="/hosts/create/" element={<CreateHost />} />
         <Route path="/hosts/:host_id/containers/create/" element={<CreateContainer />} />
         <Route path="/hosts/:host_id/containers" element={<HostDetail />} />
+        <Route path="/hosts/:hostId/networks/create" element={<CreateNetwork />} />
+        <Route path="/hosts/:hostId/networks" element={<ManageNetworks />} />
       </Routes>
     </Router>
   );

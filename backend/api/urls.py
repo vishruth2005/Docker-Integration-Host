@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import viewer_only_view, developer_only_view, admin_only_view, register_user, login_user, root_view, connect_to_host, start_container, stop_container, get_container_logs, get_container_details,create_host, create_container, get_container_stats, create_network, delete_network, connect_container_to_network, disconnect_container_from_network, host_detail_view
+from .views import viewer_only_view, developer_only_view, admin_only_view, register_user, login_user, root_view, connect_to_host, start_container, stop_container, get_container_logs, get_container_details,create_host, create_container, get_container_stats, create_network, delete_network, connect_container_to_network, disconnect_container_from_network, host_detail_view, get_networks_by_host
 
 urlpatterns = [
     path('viewer-only/', viewer_only_view, name='viewer'),
@@ -21,4 +21,5 @@ urlpatterns = [
     path('networks/<str:network_id>/delete/', delete_network, name='delete-network'),
     path('networks/connect/', connect_container_to_network, name='connect-container-to-network'),
     path('networks/disconnect/', disconnect_container_from_network, name='disconnect-container'),
+    path('hosts/<int:host_id>/networks/', get_networks_by_host, name='networks-by-host'),
 ]

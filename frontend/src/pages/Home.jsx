@@ -108,27 +108,35 @@ export default function Home() {
             </tr>
           </thead>
           <tbody>
-            {hosts.map((host) => (
-              <tr key={host.id}>
-                <td>
-                  <div>{host.host_name}</div>
-                  <div>{host.description}</div>
-                </td>
-                <td>{host.host_ip}</td>
-                <td>{host.status}</td>
-                <td>
-                  <button onClick={() => navigate(`/hosts/${host.id}/containers`)}>
-                    View Containers
-                  </button>
-                  {(role === 'admin' || role === 'developer') && (
+          {hosts.map((host) => (
+            <tr key={host.id}>
+              <td>
+                <div>{host.host_name}</div>
+                <div>{host.description}</div>
+              </td>
+              <td>{host.host_ip}</td>
+              <td>{host.status}</td>
+              <td>
+                <button onClick={() => navigate(`/hosts/${host.id}/containers`)}>
+                  View Containers
+                </button>
+                {(role === 'admin' || role === 'developer') && (
+                  <>
                     <button onClick={() => navigate(`/hosts/${host.id}/containers/create`)}>
                       Create Container
                     </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
+                    <button onClick={() => navigate(`/hosts/${host.id}/networks/create`)}>
+                      Create Network
+                    </button>
+                    <button onClick={() => navigate(`/hosts/${host.id}/networks`)}>
+                      Manage Network
+                    </button>
+                  </>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
         </table>
       </div>
     </div>
