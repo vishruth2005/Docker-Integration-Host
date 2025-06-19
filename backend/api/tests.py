@@ -1,10 +1,11 @@
-# Import your model
-from .models import ContainerRecord
+import docker
 
-# Get an existing DockerHost instance (or create a new one)
-container = ContainerRecord.objects.get(container_id='ddbfcf692f95')  # or filter by some field
+# Connect to Docker daemon
+client = docker.from_env()
 
-# Test connection
-stats = container.stats()
+# Get the container (by name or ID)
+container = client.containers.get('e257e9edfd8a2ac23730096e79e8efc3ba24823d74368778cf7de191483b2955')
 
-print("stats" , stats)
+# Stream logs
+for line in container.logs(stream=True):
+    print(line.decode('utf-8').strip())

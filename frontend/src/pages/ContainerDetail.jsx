@@ -14,6 +14,8 @@ export default function ContainerDetail() {
   const [allNetworks, setAllNetworks] = useState([]);
   const [connectedNetworks, setConnectedNetworks] = useState([]);
   const [selectedNetwork, setSelectedNetwork] = useState('');
+  const [liveLogs, setLiveLogs] = useState([]);
+  const [ws, setWs] = useState(null);
   const navigate = useNavigate();
 
   const fetchContainerDetails = async () => {
@@ -92,24 +94,33 @@ export default function ContainerDetail() {
     }
   };
 
-  const handleViewLogs = async () => {
-    const token = getAccessToken();
-    try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/logs/`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.status === 200) {
-        setLogs(data.logs || 'No logs available.');
-        setShowLogs(true);
-      } else {
-        throw new Error(data.message || 'Failed to fetch logs');
+  const handleViewLogs = () => {
+    const socket = new WebSocket('ws://localhost:8000/ws/socket-server/');
+    
+    socket.onopen = () => {
+      console.log('WebSocket connected');
+      socket.send(JSON.stringify({ container_id: container.container_id }));  // Just to trigger backend send
+    };
+  
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'log') {
+        setLiveLogs(prev => [...prev, data.message]);
       }
-    } catch (err) {
-      setError(err.message);
-    }
+    };
+  
+    socket.onerror = (err) => {
+      console.error('WebSocket error:', err);
+    };
+  
+    socket.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+  
+    setWs(socket);
+    setShowLogs(true);
   };
+  
 
   const handleViewStats = async () => {
     const token = getAccessToken();
@@ -281,11 +292,23 @@ export default function ContainerDetail() {
       </button>
 
       {showLogs && (
-        <div style={{ marginTop: '20px', whiteSpace: 'pre-wrap', background: '#f4f4f4', padding: '10px', borderRadius: '5px' }}>
-          <h3>Logs:</h3>
-          <code>{logs}</code>
+        <div style={{
+          marginTop: '20px',
+          background: '#000',
+          color: '#0f0',
+          padding: '10px',
+          borderRadius: '5px',
+          height: '300px',
+          overflowY: 'scroll',
+          fontFamily: 'monospace'
+        }}>
+          <h3 style={{ color: '#fff' }}>Live Logs:</h3>
+          {liveLogs.map((log, idx) => (
+            <div key={idx}>{log}</div>
+          ))}
         </div>
       )}
+
 
       {showStats && stats && (
         <div style={{ marginTop: '20px', background: '#eef', padding: '10px', borderRadius: '5px' }}>
