@@ -16,6 +16,11 @@ export default function ContainerDetail() {
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [liveLogs, setLiveLogs] = useState([]);
   const [ws, setWs] = useState(null);
+  const [terminalWs, setTerminalWs] = useState(null);
+  const [terminalOutput, setTerminalOutput] = useState('');
+  const [command, setCommand] = useState('');
+  const [showTerminal, setShowTerminal] = useState(false);
+
   const navigate = useNavigate();
 
   const fetchContainerDetails = async () => {
@@ -74,6 +79,12 @@ export default function ContainerDetail() {
     fetchNetworks();
   }, [container_id, navigate]);
 
+  useEffect(() => {
+    return () => {
+      if (terminalWs) terminalWs.close();
+    };
+  }, [terminalWs]);
+  
   const handleAction = async (action) => {
     const token = getAccessToken();
     const endpoint = action === 'start' ? 'start' : 'stop';
@@ -194,6 +205,62 @@ export default function ContainerDetail() {
       setError(err.message);
     }
   };
+
+  // 1. Open terminal: create exec session and open websocket
+  const handleOpenTerminal = async () => {
+    const token = getAccessToken();
+    setTerminalOutput('');
+    setShowTerminal(true);
+
+    // Step 1: Create exec session via REST API
+    const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/exec/`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (!res.ok || !data.exec_id) {
+      setTerminalOutput('Failed to create exec session');
+      return;
+    }
+    const exec_id = data.exec_id;
+
+    // Step 2: Open WebSocket to terminal endpoint
+    const wsUrl = `ws://localhost:8000/ws/terminal/${container_id}/${exec_id}/`;
+    const ws = new window.WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      setTerminalOutput('Connected to terminal.\n');
+    };
+
+    ws.onmessage = (event) => {
+      setTerminalOutput(prev => prev + event.data);
+    };
+
+    ws.onerror = (e) => {
+      setTerminalOutput(prev => prev + '\nWebSocket error\n');
+    };
+
+    ws.onclose = () => {
+      setTerminalOutput(prev => prev + '\nTerminal closed\n');
+    };
+
+    setTerminalWs(ws);
+  };
+
+  // 2. Send command over websocket
+  const handleSendCommand = () => {
+    if (terminalWs && terminalWs.readyState === WebSocket.OPEN && command.trim() !== '') {
+      terminalWs.send(command + '\n');
+      setCommand('');
+    }
+  };
+
+  // 3. Close terminal websocket
+  const handleCloseTerminal = () => {
+    if (terminalWs) terminalWs.close();
+    setShowTerminal(false);
+  };
+
   
 
   if (error) return <p>Error: {error}</p>;
@@ -290,6 +357,34 @@ export default function ContainerDetail() {
       <button onClick={handleViewLogs} style={{ marginTop: '10px' }}>
         View Logs
       </button>
+
+      <button style={{ marginTop: '10px', marginLeft: '10px' }} onClick={handleOpenTerminal}>Execute Command</button>
+
+      {showTerminal && (
+        <div style={{
+          marginTop: '20px',
+          background: '#222',
+          color: '#0f0',
+          padding: '10px',
+          borderRadius: '5px',
+          fontFamily: 'monospace'
+        }}>
+          <h3>Terminal</h3>
+          <pre style={{ minHeight: 100, maxHeight: 300, overflowY: 'auto' }}>{terminalOutput}</pre>
+          <input
+            type="text"
+            value={command}
+            onChange={e => setCommand(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleSendCommand();
+            }}
+            style={{ width: '80%', marginRight: 8 }}
+            placeholder="Type command and press Enter"
+          />
+          <button onClick={handleSendCommand}>Send</button>
+          <button onClick={handleCloseTerminal} style={{ marginLeft: 10 }}>Close</button>
+        </div>
+      )}
 
       {showLogs && (
         <div style={{

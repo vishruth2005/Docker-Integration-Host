@@ -548,3 +548,26 @@ def container_connected_networks(request, host_id, container_id):
         return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_exec_session(request, host_id, container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host_id=host_id)
+        
+        # Permission check
+        if not (request.user.is_admin() or request.user == container.created_by):
+            return Response({"error": "Permission denied"}, status=403)
+        
+        client = docker.DockerClient(base_url=container.host.docker_api_url)
+        exec_instance = client.api.exec_create(
+            container=container_id,
+            cmd="/bin/sh",
+            tty=True,
+            stdin=True
+        )
+        return Response({"exec_id": exec_instance['Id']}, status=201)
+    
+    except (ContainerRecord.DoesNotExist, DockerHost.DoesNotExist):
+        return Response({"error": "Resource not found"}, status=404)

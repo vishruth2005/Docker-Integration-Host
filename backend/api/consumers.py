@@ -2,6 +2,7 @@ import json
 import threading
 import docker
 from channels.generic.websocket import WebsocketConsumer
+from .models import ContainerRecord, DockerHost
 
 class ChatConsumer(WebsocketConsumer):
     def connect(self):
@@ -25,7 +26,8 @@ class ChatConsumer(WebsocketConsumer):
             }))
 
     def stream_container_logs(self, container_id):
-        client = docker.from_env()
+        container = ContainerRecord.objects.get(container_id=container_id)
+        client = docker.DockerClient(base_url=container.host.docker_api_url)
         try:
             container = client.containers.get(container_id)
 
@@ -44,3 +46,38 @@ class ChatConsumer(WebsocketConsumer):
                 'type': 'error',
                 'message': str(e)
             }))
+
+class TerminalConsumer(WebsocketConsumer):
+    def connect(self):
+        self.container_id = self.scope['url_route']['kwargs']['container_id']
+        self.exec_id = self.scope['url_route']['kwargs']['exec_id']
+        self.accept()
+        self.start_terminal_session()
+
+    def start_terminal_session(self):
+        container_record = ContainerRecord.objects.get(container_id=self.container_id)
+        docker_api_url = container_record.host.docker_api_url
+        client = docker.DockerClient(base_url=docker_api_url)
+        self.exec_socket = client.api.exec_start(
+            exec_id=self.exec_id,
+            socket=True,
+            tty=True,
+            stream=True
+        )
+        threading.Thread(target=self.stream_output).start()
+
+    def stream_output(self):
+        try:
+            while True:
+                data = self.exec_socket.recv(4096)
+                if not data:
+                    break
+                self.send(text_data=data.decode('utf-8', errors='replace'))
+        except Exception:
+            pass
+
+    def receive(self, text_data):
+        self.exec_socket.send(text_data.encode('utf-8'))
+
+    def disconnect(self, close_code):
+        self.exec_socket.close()
