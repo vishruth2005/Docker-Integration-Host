@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import status
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer, NetworkSerializer
-from .models import ContainerRecord, DockerHost, Network
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer, NetworkSerializer, VolumeSerializer
+from .models import ContainerRecord, DockerHost, Network, Volume
 from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 import docker
@@ -571,3 +571,86 @@ def create_exec_session(request, host_id, container_id):
     
     except (ContainerRecord.DoesNotExist, DockerHost.DoesNotExist):
         return Response({"error": "Resource not found"}, status=404)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_volumes_by_host(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+
+        # Check if user has access
+        if not (request.user.is_admin() or request.user == host.owner):
+            return Response({'message': 'Permission denied'}, status=403)
+
+        volumes = Volume.objects.filter(host=host)
+        serializer = VolumeSerializer(volumes, many=True)
+        return Response(serializer.data)
+    except DockerHost.DoesNotExist:
+        return Response({'message': 'Docker host not found'}, status=404)
+    
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_volume(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+
+        if not (request.user.is_admin() or request.user == host.owner):
+            return Response({'message': 'Permission denied'}, status=403)
+
+        name = request.data.get('name')
+        labels = request.data.get('labels', {})
+        driver = request.data.get('driver', 'local')
+
+        if not name:
+            return Response({'message': 'Volume name required'}, status=400)
+
+        client = docker.DockerClient(base_url=host.docker_api_url)
+        docker_volume = client.volumes.create(name=name, driver=driver, labels=labels)
+
+        volume = Volume.objects.create(
+            name=docker_volume.name,
+            driver=docker_volume.attrs.get('Driver', 'local'),
+            mountpoint=docker_volume.attrs.get('Mountpoint'),
+            labels=docker_volume.attrs.get('Labels', {}),
+            host=host
+        )
+
+        serializer = VolumeSerializer(volume)
+        return Response(serializer.data, status=201)
+
+    except DockerHost.DoesNotExist:
+        return Response({'message': 'Docker host not found'}, status=404)
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker API error: {str(e)}'}, status=400)
+    except Exception as e:
+        return Response({'message': f'Error: {str(e)}'}, status=500)
+    
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_volume(request, volume_id):
+    try:
+        volume = Volume.objects.get(id=volume_id)
+        client = docker.DockerClient(base_url=volume.host.docker_api_url)
+
+        docker_volume= client.volumes.get(volume.name)
+        docker_volume.remove()
+
+        volume.delete()
+
+        return Response({'message': 'Docker volume deleted successfully.'}, status=status.HTTP_200_OK)
+
+    except Volume.DoesNotExist:
+        return Response({'message': 'Volume not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    except docker.errors.NotFound:
+        volume.delete()  
+        return Response({'message': 'Docker volume not found. Removed from DB.'}, status=status.HTTP_200_OK)
+
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)

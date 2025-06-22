@@ -131,6 +131,12 @@ export default function Home() {
                     <button onClick={() => navigate(`/hosts/${host.id}/networks`)}>
                       Manage Network
                     </button>
+                    <button onClick={() => navigate(`/hosts/${host.id}/volumes/create`)}>
+                      Create Volume
+                    </button>
+                    <button onClick={() => navigate(`/hosts/${host.id}/volumes`)}>
+                      Manage Volumes
+                    </button>
                   </>
                 )}
               </td>

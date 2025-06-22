@@ -100,7 +100,7 @@ export default function CreateHost() {
   };
 
   return (
-    <div>
+    <div style={{ padding: '20px'}}>
       <h2>Create Docker Host</h2>
       
       {/* Success Message */}
@@ -119,7 +119,7 @@ export default function CreateHost() {
           <h3>Required Fields</h3>
           <div>
             <div>
-              <label>Host Name</label>
+              <label>Host Name:</label>
               <input
                 type="text"
                 value={formData.host_name}
@@ -129,7 +129,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-              <label>Host IP</label>
+              <label>Host IP:</label>
               <input
                 type="text"
                 value={formData.host_ip}
@@ -139,7 +139,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-                <label>Docker API URL</label>
+                <label>Docker API URL:</label>
                 <input
                     type="text"
                     value={formData.docker_api_url}
@@ -148,7 +148,7 @@ export default function CreateHost() {
                 </div>
 
             <div>
-              <label>Port</label>
+              <label>Port:</label>
               <input
                 type="number"
                 value={formData.port}
@@ -158,7 +158,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-              <label>Connection Protocol</label>
+              <label>Connection Protocol:</label>
               <select
                 value={formData.connection_protocol}
                 onChange={(e) => setFormData({ ...formData, connection_protocol: e.target.value })}
@@ -176,7 +176,7 @@ export default function CreateHost() {
           <h3>Authentication</h3>
           <div>
             <div>
-              <label>Authentication Type</label>
+              <label>Authentication Type:</label>
               <select
                 value={formData.auth_type}
                 onChange={(e) => setFormData({ ...formData, auth_type: e.target.value })}
@@ -190,7 +190,7 @@ export default function CreateHost() {
             {formData.auth_type === 'tls' && (
               <>
                 <div>
-                  <label>TLS Certificate</label>
+                  <label>TLS Certificate:</label>
                   <textarea
                     value={formData.tls_cert}
                     onChange={(e) => setFormData({ ...formData, tls_cert: e.target.value })}
@@ -198,7 +198,7 @@ export default function CreateHost() {
                   />
                 </div>
                 <div>
-                  <label>TLS Key</label>
+                  <label>TLS Key:</label>
                   <textarea
                     value={formData.tls_key}
                     onChange={(e) => setFormData({ ...formData, tls_key: e.target.value })}
@@ -206,7 +206,7 @@ export default function CreateHost() {
                   />
                 </div>
                 <div>
-                  <label>CA Certificate</label>
+                  <label>CA Certificate:</label>
                   <textarea
                     value={formData.tls_ca_cert}
                     onChange={(e) => setFormData({ ...formData, tls_ca_cert: e.target.value })}
@@ -219,7 +219,7 @@ export default function CreateHost() {
             {formData.auth_type === 'ssh' && (
               <>
                 <div>
-                  <label>SSH Username</label>
+                  <label>SSH Username:</label>
                   <input
                     type="text"
                     value={formData.ssh_username}
@@ -227,7 +227,7 @@ export default function CreateHost() {
                   />
                 </div>
                 <div>
-                  <label>SSH Private Key</label>
+                  <label>SSH Private Key:</label>
                   <textarea
                     value={formData.ssh_private_key}
                     onChange={(e) => setFormData({ ...formData, ssh_private_key: e.target.value })}
@@ -235,7 +235,7 @@ export default function CreateHost() {
                   />
                 </div>
                 <div>
-                  <label>SSH Password</label>
+                  <label>SSH Password:</label>
                   <input
                     type="password"
                     value={formData.ssh_password}
@@ -252,7 +252,7 @@ export default function CreateHost() {
           <h3>Optional Details</h3>
           <div>
             <div>
-              <label>Labels (comma-separated)</label>
+              <label>Labels (comma-separated):</label>
               <input
                 type="text"
                 value={formData.labels}
@@ -262,7 +262,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-              <label>Operating System</label>
+              <label>Operating System:</label>
               <input
                 type="text"
                 value={formData.operating_system}
@@ -272,7 +272,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-              <label>Docker Version</label>
+              <label>Docker Version:</label>
               <input
                 type="text"
                 value={formData.docker_version}
@@ -282,7 +282,7 @@ export default function CreateHost() {
             </div>
 
             <div>
-              <label>Description</label>
+              <label>Description:</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -291,6 +291,7 @@ export default function CreateHost() {
             </div>
           </div>
         </div>
+        <br />
 
         {/* Action Buttons */}
         <div>

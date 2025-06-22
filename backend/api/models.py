@@ -227,3 +227,14 @@ class Network(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.driver})"
+    
+class Volume(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    driver = models.CharField(max_length=100, default='local')
+    mountpoint = models.CharField(max_length=255, blank=True, null=True)
+    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='volumes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    labels = models.JSONField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name

@@ -9,6 +9,8 @@ import CreateContainer from './pages/CreateContainer';
 import HostDetail from './pages/HostDetail';
 import CreateNetwork from './pages/CreateNetwork';
 import ManageNetworks from './pages/ManageNetworks';
+import CreateVolume from './pages/CreateVolume';
+import ManageVolumes from './pages/ManageVolumes';
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/hosts/:host_id/containers" element={<HostDetail />} />
         <Route path="/hosts/:hostId/networks/create" element={<CreateNetwork />} />
         <Route path="/hosts/:hostId/networks" element={<ManageNetworks />} />
+        <Route path="hosts/:host_id/volumes/create/" element={<CreateVolume />} />
+        <Route path="hosts/:host_id/volumes/" element={<ManageVolumes />} />
       </Routes>
     </Router>
   );

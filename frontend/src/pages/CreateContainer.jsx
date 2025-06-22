@@ -52,7 +52,7 @@ export default function CreateContainer() {
   };
 
   return (
-    <div>
+    <div style={{ padding: '20px' }}>
       <h2>Create Container</h2>
 
       {error && ( <div> {error} </div> )}
@@ -61,7 +61,7 @@ export default function CreateContainer() {
 
       <form onSubmit={handleSubmit} >
         <div>
-          <label>Container Name</label>
+          <label>Container Name:</label>
           <input
             type="text"
             value={formData.name}
@@ -69,9 +69,10 @@ export default function CreateContainer() {
             required
           />
         </div>
+        <br /><br />
 
         <div>
-          <label>Image</label>
+          <label>Image:</label>
           <input
             type="text"
             value={formData.image}
@@ -80,9 +81,10 @@ export default function CreateContainer() {
             required
           />
         </div>
+        <br /><br />
 
         <div>
-          <label>Port Mappings (JSON)</label>
+          <label>Port Mappings (JSON):</label>
           <textarea
             value={JSON.stringify(formData.ports)}
             onChange={(e) => {
@@ -95,9 +97,10 @@ export default function CreateContainer() {
             rows="2"
           />
         </div>
+        <br /><br />
 
         <div>
-          <label>Environment Variables (JSON)</label>
+          <label>Environment Variables (JSON):</label>
           <textarea
             value={JSON.stringify(formData.environment)}
             onChange={(e) => {
@@ -110,6 +113,7 @@ export default function CreateContainer() {
             rows="2"
           />
         </div>
+        <br /><br />
 
         <div>
           <label>
@@ -121,6 +125,7 @@ export default function CreateContainer() {
             <span>Start container after creation</span>
           </label>
         </div>
+        <br />
 
         <div>
           <button
