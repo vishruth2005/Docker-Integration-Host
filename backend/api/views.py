@@ -190,6 +190,12 @@ def create_container(request, host_id):
             return Response({
                 'message': 'Missing required fields'
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Handle volumes: expect a list of volume IDs
+        volume_ids = request.data.get('volumes', [])
+        volumes_qs = Volume.objects.filter(id__in=volume_ids, host=host)
+        # For Docker SDK, mount at /mnt/{volume_name}
+        docker_volumes = {v.name: {'bind': f'/mnt/{v.name}', 'mode': 'rw'} for v in volumes_qs}
 
         # Create container record
         container_data = {
@@ -208,7 +214,7 @@ def create_container(request, host_id):
             'image': request.data['image'],
             'ports': request.data.get('ports', {}),
             'environment': request.data.get('environment', {}),
-            'volumes': request.data.get('volumes', []),
+            'volumes': docker_volumes,
             'command': request.data.get('command', None)
         }
 
@@ -223,6 +229,9 @@ def create_container(request, host_id):
             
             # Save container record
             container = ContainerRecord.objects.create(**container_data)
+
+            # Attach volumes to the record
+            container.volumes.set(volumes_qs)
             
             # Add permissions
             if 'viewable_by' in request.data:

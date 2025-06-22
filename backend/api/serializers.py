@@ -84,11 +84,18 @@ class DockerHostSerializer(serializers.ModelSerializer):
 
         return data
 
+class VolumeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Volume
+        fields = ['id', 'name', 'driver', 'mountpoint', 'labels', 'created_at', 'host']
+        read_only_fields = ['id', 'name', 'created_at', 'mountpoint']
+
 class ContainerRecordSerializer(serializers.ModelSerializer):
     host = DockerHostSerializer(read_only=True)
     created_by = serializers.SerializerMethodField()
     editable_by = serializers.SerializerMethodField()
     viewable_by = serializers.SerializerMethodField()
+    volumes = VolumeSerializer(many=True, read_only=True)
 
     class Meta:
         model = ContainerRecord
@@ -109,6 +116,7 @@ class ContainerRecordSerializer(serializers.ModelSerializer):
             'viewable_by',
             'last_updated',
             'is_active',
+            'volumes',
         ]
         read_only_fields = [
             'created_at',
@@ -148,9 +156,3 @@ class NetworkSerializer(serializers.ModelSerializer):
             'host_id'
         ]
         read_only_fields = ['id', 'created_at', 'host']
-
-class VolumeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Volume
-        fields = ['id', 'name', 'driver', 'mountpoint', 'labels', 'created_at', 'host']
-        read_only_fields = ['id', 'created_at', 'mountpoint']

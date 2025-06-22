@@ -33,6 +33,8 @@ class ContainerRecord(models.Model):
 
     host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='containers')
 
+    volumes = models.ManyToManyField('Volume', related_name='containers', blank=True)
+
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, related_name='created_containers'
     )

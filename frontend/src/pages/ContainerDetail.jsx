@@ -283,7 +283,22 @@ export default function ContainerDetail() {
       <p><strong>Restarted Count:</strong> {container.restarted_count}</p>
       <p><strong>Internal Ports:</strong> {container.internal_ports}</p>
       <p><strong>Port Bindings:</strong> {container.port_bindings}</p>
-      <p><strong>Host:</strong> {container.host?.name || 'N/A'}</p>
+      <p>
+        <strong>Mounted Volumes:</strong>
+          {container.volumes && container.volumes.length > 0 ? (
+          <ul>
+            {container.volumes.map((vol) => (
+              <li key={vol.id}>
+                <strong>{vol.name}</strong>
+                {vol.mountpoint && <> (Mountpoint: {vol.mountpoint})</>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No volumes attached to this container.</p>
+        )}
+      </p>
+      <p><strong>Host:</strong> {container.host?.host_name || 'N/A'}</p>
 
       <div style={{ marginTop: '20px' }}>
         <h4>Connected Networks:</h4>
