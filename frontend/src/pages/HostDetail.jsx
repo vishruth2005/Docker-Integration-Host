@@ -42,6 +42,27 @@ export default function HostDetail() {
         fetchHostDetails();
     }, [host_id, navigate]);  
 
+    const handleDelete = (container_id) => {
+        const token = getAccessToken();
+        fetch(`http://localhost:8000/hosts/${host_id}/containers/${container_id}/delete/`, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+        })
+        .then(res => {
+            if (res.status === 204) {
+            // Refresh the container list
+            setContainers();
+            } else {
+            res.json().then(data => {
+                alert(data.message || 'Failed to delete container');
+            });
+            }
+        })
+        .catch(() => alert('Delete request failed'));
+    };
+
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
     if (!host) return <div>Host not found</div>;
@@ -94,6 +115,9 @@ export default function HostDetail() {
                                 <td>
                                     <button onClick={() => navigate(`/${host.id}/${container.container_id}`)}>
                                         View Details
+                                    </button>
+                                    <button onClick={() => handleDelete(container.container_id)}>
+                                        Delete
                                     </button>
                                 </td>
                             </tr>

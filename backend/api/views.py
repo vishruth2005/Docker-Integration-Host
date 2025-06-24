@@ -1,3 +1,4 @@
+import docker.errors
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, BasePermission
@@ -12,6 +13,7 @@ import docker
 from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 
 def create_default_groups():
@@ -221,34 +223,20 @@ def create_container(request, host_id):
         try:
             # Create container in Docker
             client = docker.DockerClient(base_url=f"{host.docker_api_url}")
+
+            # Pull image if not found
+            try:
+                client.images.get(request.data['image'])
+            except docker.errors.NotFound:
+                client.images.pull(request.data['image'])
+
             docker_container = client.containers.create(**container_config)
-            
-            # Update container record with actual container ID
-            container_data['container_id'] = docker_container.id
-            container_data['status'] = 'created'
-            
-            # Save container record
-            container = ContainerRecord.objects.create(**container_data)
-
-            # Attach volumes to the record
-            container.volumes.set(volumes_qs)
-            
-            # Add permissions
-            if 'viewable_by' in request.data:
-                container.viewable_by.add(*request.data['viewable_by'])
-            if 'editable_by' in request.data:
-                container.editable_by.add(*request.data['editable_by'])
-
-            # Start container if requested
-            if request.data.get('start', False):
-                docker_container.start()
-                container.status = 'running'
-                container.save()
-
-            serializer = ContainerRecordSerializer(container)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except docker.errors.APIError as e:
+            if 'port is already allocated' in str(e).lower():
+                return Response({
+                    'message': 'Port conflict: A container on this host is already using one of the requested ports.'
+                }, status=status.HTTP_409_CONFLICT)
             return Response({
                 'message': f'Docker API error: {str(e)}'
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -257,10 +245,80 @@ def create_container(request, host_id):
                 'message': f'Error creating container: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        with transaction.atomic():    
+            container = ContainerRecord.objects.create(
+                container_id=docker_container.id,
+                name=request.data['name'],
+                image=request.data['image'],
+                status='created',
+                created_at=timezone.now(),
+                host=host,
+                created_by=request.user
+            )
+            container.volumes.set(volumes_qs)
+
+            if 'viewable_by' in request.data:
+                container.viewable_by.add(*request.data['viewable_by'])
+            if 'editable_by' in request.data:
+                container.editable_by.add(*request.data['editable_by'])
+
+            if request.data.get('start', False):
+                docker_container.start()
+                container.status = 'running'
+                container.save()
+
+            serializer = ContainerRecordSerializer(container)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     except DockerHost.DoesNotExist:
         return Response({
             'message': 'Docker host not found'
         }, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_container(request, host_id, container_id):
+    try:
+        container = ContainerRecord.objects.get(host__id=host_id, container_id=container_id)
+
+        if not (request.user.is_admin() or request.user == container.created_by or request.user in container.editable_by.all()):
+            return Response({
+                'message': 'Permission denied'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            client = docker.DockerClient(base_url=container.host.docker_api_url)
+
+            try:
+                docker_container = client.containers.get(container_id)
+
+                if docker_container.status == 'running':
+                    docker_container.stop()
+                
+                docker_container.remove()
+
+            except docker.errors.NotFound:
+                # Container doesn't exist in Docker — treat as soft-deleted
+                pass
+            except docker.errors.DockerAPIError as e:
+                return Response({
+                    'message': f'Docker API error: {str(e)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            container.delete()
+            
+            return Response({
+                'message': 'Container deleted successfully'
+            }, status=status.HTTP_204_NO_CONTENT)
+        
+        except DockerHost.DoesNotExist:
+            return Response({
+                'message': 'Docker host not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    except ContainerRecord.DoesNotExist:
+        return Response({'message': 'Container not found'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
