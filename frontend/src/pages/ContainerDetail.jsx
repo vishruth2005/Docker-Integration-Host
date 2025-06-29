@@ -20,6 +20,8 @@ export default function ContainerDetail() {
   const [terminalOutput, setTerminalOutput] = useState('');
   const [command, setCommand] = useState('');
   const [showTerminal, setShowTerminal] = useState(false);
+  const [volumeBindings, setVolumeBindings] = useState([]);
+  const [showVolumeBindings, setShowVolumeBindings] = useState(false);
 
   const navigate = useNavigate();
 
@@ -39,6 +41,30 @@ export default function ContainerDetail() {
       setContainer(data);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const fetchVolumeBindings = async () => {
+    const token = getAccessToken();
+    try {
+      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/volumes/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 401) {
+        logout();
+        navigate('/login');
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setVolumeBindings(data.volume_bindings || []);
+      } else {
+        console.error('Failed to fetch volume bindings:', res.status, res.statusText);
+        setVolumeBindings([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch volume bindings:', err);
+      setVolumeBindings([]);
     }
   };
 
@@ -77,6 +103,7 @@ export default function ContainerDetail() {
     }
     fetchContainerDetails();
     fetchNetworks();
+    fetchVolumeBindings();
   }, [container_id, navigate]);
 
   useEffect(() => {
@@ -283,21 +310,96 @@ export default function ContainerDetail() {
       <p><strong>Restarted Count:</strong> {container.restarted_count}</p>
       <p><strong>Internal Ports:</strong> {container.internal_ports}</p>
       <p><strong>Port Bindings:</strong> {container.port_bindings}</p>
-      <p>
-        <strong>Mounted Volumes:</strong>
+      
+      {/* Enhanced Volume Display */}
+      <div style={{ marginTop: '20px' }}>
+        <h4>Volume Information</h4>
+        
+        {/* Refresh Button */}
+        <button 
+          onClick={fetchVolumeBindings}
+          style={{ 
+            marginBottom: '15px',
+            padding: '5px 10px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.9em'
+          }}
+        >
+          🔄 Refresh Volume Bindings
+        </button>
+        
+        {/* Database Volumes */}
+        <div style={{ marginBottom: '15px' }}>
+          <h5>Associated Volumes (Database)</h5>
           {container.volumes && container.volumes.length > 0 ? (
-          <ul>
-            {container.volumes.map((vol) => (
-              <li key={vol.id}>
-                <strong>{vol.name}</strong>
-                {vol.mountpoint && <> (Mountpoint: {vol.mountpoint})</>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No volumes attached to this container.</p>
-        )}
-      </p>
+            <ul>
+              {container.volumes.map((vol) => (
+                <li key={vol.id} style={{ marginBottom: '8px' }}>
+                  <strong>{vol.name}</strong>
+                  {vol.mountpoint && <> (Mountpoint: {vol.mountpoint})</>}
+                  {vol.driver && <> - Driver: {vol.driver}</>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No volumes associated with this container in the database.</p>
+          )}
+        </div>
+
+        {/* Actual Volume Bindings */}
+        <div style={{ marginBottom: '15px' }}>
+          <h5>Active Volume Bindings (Container)</h5>
+          {volumeBindings.length > 0 ? (
+            <ul>
+              {volumeBindings.map((binding, index) => (
+                <li key={index} style={{ marginBottom: '8px' }}>
+                  <strong>{binding.volume_name}</strong>
+                  <br />
+                  <span style={{ marginLeft: '20px', fontSize: '0.9em', color: '#666' }}>
+                    Mount Point: {binding.mount_point}
+                  </span>
+                  <br />
+                  <span style={{ marginLeft: '20px', fontSize: '0.9em', color: '#666' }}>
+                    Mode: {binding.mode}
+                  </span>
+                  {binding.in_database ? (
+                    <span style={{ marginLeft: '10px', color: 'green', fontSize: '0.8em' }}>
+                      ✓ In Database
+                    </span>
+                  ) : (
+                    <span style={{ marginLeft: '10px', color: 'orange', fontSize: '0.8em' }}>
+                      ⚠ Not in Database
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No active volume bindings found in the container.</p>
+          )}
+        </div>
+
+        {/* Volume Binding Summary */}
+        <div style={{ 
+          background: '#f5f5f5', 
+          padding: '10px', 
+          borderRadius: '5px',
+          fontSize: '0.9em'
+        }}>
+          <strong>Summary:</strong>
+          <br />
+          • Database volumes: {container.volumes ? container.volumes.length : 0}
+          <br />
+          • Active bindings: {volumeBindings.length}
+          <br />
+          • Expected mount points: {container.volumes ? container.volumes.map(v => `/mnt/${v.name}`).join(', ') : 'None'}
+        </div>
+      </div>
+
       <p><strong>Host:</strong> {container.host?.host_name || 'N/A'}</p>
 
       <div style={{ marginTop: '20px' }}>

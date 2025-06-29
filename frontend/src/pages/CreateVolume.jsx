@@ -50,64 +50,106 @@ export default function CreateVolume() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>Create Volume</h2>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-      {success && <div style={{ color: 'green' }}>{success}</div>}
+    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+      <h2>Create Docker Volume</h2>
+      {error && <div style={{ color: 'red', padding: '10px', backgroundColor: '#ffe6e6', borderRadius: '4px', marginBottom: '15px' }}>{error}</div>}
+      {success && <div style={{ color: 'green', padding: '10px', backgroundColor: '#e6ffe6', borderRadius: '4px', marginBottom: '15px' }}>{success}</div>}
 
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Volume Name:</label>
+      <form onSubmit={handleSubmit} style={{ backgroundColor: '#f9f9f9', padding: '20px', borderRadius: '8px' }}>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Volume Name *
+          </label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g., mydata, app-storage, database-backup"
             required
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
           />
+          <small style={{ color: '#666', fontSize: '0.9em' }}>
+            Unique name for the volume. Will be mounted as /mnt/{formData.name || 'volumename'} in containers
+          </small>
         </div>
-        <br /><br />
 
-        <div>
-          <label>Driver:</label>
-          <input
-            type="text"
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Driver
+          </label>
+          <select
             value={formData.driver}
             onChange={(e) => setFormData({ ...formData, driver: e.target.value })}
-          />
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+          >
+            <option value="local">local (Default - Local filesystem)</option>
+            <option value="nfs">nfs (Network File System)</option>
+            <option value="cifs">cifs (Windows SMB/CIFS)</option>
+            <option value="tmpfs">tmpfs (Temporary filesystem)</option>
+          </select>
+          <small style={{ color: '#666', fontSize: '0.9em' }}>
+            Storage driver for the volume. 'local' is most common for persistent data
+          </small>
         </div>
-        <br /><br />
 
-        <div>
-          <label>Labels (JSON)</label>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Labels (JSON Format)
+          </label>
           <textarea
-            rows="2"
+            rows="4"
             value={formData.labels}
             onChange={(e) => setFormData({ ...formData, labels: e.target.value })}
-            placeholder='{"env": "prod"}'
+            placeholder='{"environment": "production", "app": "webapp", "backup": "daily"}'
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd', fontFamily: 'monospace' }}
           />
+          <small style={{ color: '#666', fontSize: '0.9em' }}>
+            Optional metadata as JSON. Use for organizing volumes (environment, app name, etc.)
+          </small>
         </div>
-        <br /><br />
 
-        <div>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => navigate(`/hosts/${host_id}/volumes`)}
             disabled={isSubmitting}
+            style={{ 
+              padding: '10px 20px', 
+              backgroundColor: '#6c757d', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer' 
+            }}
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
+            style={{ 
+              padding: '10px 20px', 
+              backgroundColor: '#007bff', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer' 
+            }}
           >
-            {isSubmitting ? (
-              <> Creating... </>
-            ) : (
-              'Create Volume'
-            )}
+            {isSubmitting ? 'Creating...' : 'Create Volume'}
           </button>
         </div>
       </form>
+
+      <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e7f3ff', borderRadius: '4px' }}>
+        <h4 style={{ marginTop: '0' }}>Volume Usage Information</h4>
+        <ul style={{ margin: '0', paddingLeft: '20px' }}>
+          <li>Volumes persist data even when containers are removed</li>
+          <li>When attached to containers, volumes are mounted at <code>/mnt/volumename</code></li>
+          <li>Use descriptive names like "database-data" or "app-logs"</li>
+          <li>Labels help organize and identify volumes across your infrastructure</li>
+        </ul>
+      </div>
     </div>
   );
 }

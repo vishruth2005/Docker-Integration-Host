@@ -721,3 +721,46 @@ def delete_volume(request, volume_id):
 
     except Exception as e:
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_container_volume_bindings(request, host_id, container_id):
+    try:
+        container = ContainerRecord.objects.get(container_id=container_id, host=DockerHost.objects.get(id=host_id))
+        
+        # Get the Docker container to check its current volume mounts
+        client = docker.DockerClient(base_url=container.host.docker_api_url)
+        docker_container = client.containers.get(container_id)
+        
+        # Get container's current volume mounts
+        mounts = docker_container.attrs.get('Mounts', [])
+        
+        # Get associated volumes from our database
+        db_volumes = container.volumes.all()
+        
+        volume_info = []
+        for mount in mounts:
+            volume_name = mount.get('Name')
+            mount_point = mount.get('Destination')
+            mode = mount.get('RW', True)  # Read/Write by default
+            
+            # Find corresponding volume in our database
+            db_volume = db_volumes.filter(name=volume_name).first()
+            
+            volume_info.append({
+                'volume_name': volume_name,
+                'mount_point': mount_point,
+                'mode': 'rw' if mode else 'ro',
+                'in_database': db_volume is not None,
+                'volume_id': db_volume.id if db_volume else None
+            })
+        
+        return Response({
+            'container_id': container_id,
+            'container_name': container.name,
+            'volume_bindings': volume_info
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
