@@ -43,6 +43,7 @@ export default function ContainerDetail() {
   const [showTerminal, setShowTerminal] = useState(false);
   const [volumeBindings, setVolumeBindings] = useState([]);
   const [showVolumeBindings, setShowVolumeBindings] = useState(false);
+  const [restartNeeded, setRestartNeeded] = useState(false);
 
   // Chart data state
   const [cpuData, setCpuData] = useState({
@@ -206,6 +207,7 @@ export default function ContainerDetail() {
         return;
       }
       const connectedData = await res.json();
+      console.log('Connected networks response:', connectedData);
       setConnectedNetworks(connectedData);
   
       // Get all available networks
@@ -213,8 +215,10 @@ export default function ContainerDetail() {
         headers: { Authorization: `Bearer ${token}` }
       });
       const allData = await allRes.json();
+      console.log('All networks response:', allData);
       setAllNetworks(allData);
     } catch (err) {
+      console.error('Fetch networks error:', err);
       setError('Failed to fetch networks');
     }
   };
@@ -248,6 +252,7 @@ export default function ContainerDetail() {
       const data = await res.json();
       if (res.status === 200) {
         setMessage(data.message);
+        setRestartNeeded(false);
         fetchContainerDetails();
       } else {
         throw new Error(data.message || 'Action failed');
@@ -325,6 +330,11 @@ export default function ContainerDetail() {
   const handleConnectNetwork = async () => {
     const token = getAccessToken();
     try {
+      console.log('Connecting to network:', selectedNetwork, 'for container:', container.container_id);
+      console.log('Selected network details:', selectedNetwork);
+      console.log('All networks data:', allNetworks);
+      console.log('Connected networks data:', connectedNetworks);
+      
       const res = await fetch('http://localhost:8000/networks/connect/', {
         method: 'POST',
         headers: {
@@ -338,6 +348,8 @@ export default function ContainerDetail() {
       });
 
       const data = await res.json();
+      console.log('Connect response:', res.status, data);
+      
       if (res.status === 200) {
         setMessage(data.message);
         setSelectedNetwork('');
@@ -346,6 +358,7 @@ export default function ContainerDetail() {
         throw new Error(data.message || 'Failed to connect to network');
       }
     } catch (err) {
+      console.error('Connect network error:', err);
       setError(err.message);
     }
   };
@@ -353,6 +366,8 @@ export default function ContainerDetail() {
   const handleDisconnectNetwork = async (networkId) => {
     const token = getAccessToken();
     try {
+      console.log('Disconnecting from network:', networkId, 'for container:', container.container_id);
+      
       const res = await fetch('http://localhost:8000/networks/disconnect/', {
         method: 'POST',
         headers: {
@@ -366,14 +381,56 @@ export default function ContainerDetail() {
       });
   
       const data = await res.json();
+      console.log('Disconnect response:', res.status, data);
+      
       if (res.status === 200) {
         setMessage(data.message);
         fetchNetworks(); // Refresh network list
       } else {
-        throw new Error(data.message || 'Failed to disconnect from network');
+        // Handle 404 errors specifically
+        if (res.status === 404) {
+          setError(`${data.message} ${data.suggestion || ''}`);
+          // Refresh networks to get updated list
+          setTimeout(() => {
+            fetchNetworks();
+            setError('');
+          }, 3000);
+        } else {
+          throw new Error(data.message || 'Failed to disconnect from network');
+        }
       }
     } catch (err) {
+      console.error('Disconnect network error:', err);
       setError(err.message);
+    }
+  };
+
+  // Function to clean up invalid network references
+  const cleanupInvalidNetworks = async () => {
+    const token = getAccessToken();
+    try {
+      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/networks/cleanup/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setMessage(data.message);
+        if (data.requires_restart) {
+          setError('Note: Container restart may be needed to fully clear invalid network references.');
+          setRestartNeeded(true);
+        }
+        fetchNetworks(); // Refresh the network list
+      } else {
+        const data = await res.json();
+        setError(data.message || 'Failed to cleanup network references');
+      }
+    } catch (err) {
+      setError('Failed to cleanup network references');
     }
   };
 
@@ -432,7 +489,16 @@ export default function ContainerDetail() {
     setShowTerminal(false);
   };
 
-  
+  // Auto-clear messages after 5 seconds
+  useEffect(() => {
+    if (message || error) {
+      const timer = setTimeout(() => {
+        setMessage('');
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message, error]);
 
   if (error) return <p>Error: {error}</p>;
   if (!container) return <p>Loading container details...</p>;
@@ -440,6 +506,11 @@ export default function ContainerDetail() {
   const unconnectedNetworks = allNetworks.filter(
     net => !connectedNetworks.some(cn => cn.name === net.name) // Using 'name' to compare
   );
+
+  // Debug logging
+  console.log('All networks:', allNetworks);
+  console.log('Connected networks:', connectedNetworks);
+  console.log('Unconnected networks:', unconnectedNetworks);
 
   return (
     <div style={{
@@ -516,6 +587,58 @@ export default function ContainerDetail() {
         border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
       }}>
+        {/* Message Display */}
+        {message && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '0.75rem',
+            marginBottom: '2rem',
+            color: '#10b981',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            {message}
+          </div>
+        )}
+        {error && (
+          <div style={{
+            padding: '1rem',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '0.75rem',
+            marginBottom: '2rem',
+            color: '#ef4444',
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            {error}
+            {restartNeeded && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <button
+                  onClick={() => handleAction('stop').then(() => setTimeout(() => handleAction('start'), 1000))}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.75rem',
+                    marginTop: '0.5rem'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d97706'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f59e0b'}
+                >
+                  Restart Container to Clear References
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
           <div>
             <h1 style={{ fontSize: '2.5rem', fontWeight: '700', color: 'white', marginBottom: '0.5rem', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
@@ -704,7 +827,7 @@ export default function ContainerDetail() {
                                 fontSize: '0.75rem',
                                 fontWeight: '600'
                               }}>
-                                ✓ Database
+                                Database
                               </div>
                             ) : (
                               <div style={{ 
@@ -750,7 +873,33 @@ export default function ContainerDetail() {
               marginBottom: '2rem',
               border: '1px solid rgba(255,255,255,0.08)'
             }}>
-              <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem' }}>Networks</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+                <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>Networks</h2>
+                <button 
+                  onClick={cleanupInvalidNetworks}
+                  style={{ 
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.875rem',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#d97706'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f59e0b'}
+                >
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Cleanup
+                </button>
+              </div>
 
               {/* Connected Networks */}
               <div style={{ marginBottom: '2rem' }}>

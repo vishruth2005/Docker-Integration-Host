@@ -491,6 +491,8 @@ def connect_container_to_network(request):
         network_id = request.data.get('network_id')
         container_id = request.data.get('container_id')
 
+        print(f"Connect request - network_id: {network_id}, container_id: {container_id}")
+
         if not network_id or not container_id:
             return Response({'message': 'network_id and container_id are required.'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -498,6 +500,9 @@ def connect_container_to_network(request):
         # Retrieve the Network and Container from DB
         network = Network.objects.get(id=network_id)
         container = ContainerRecord.objects.get(container_id=container_id)
+
+        print(f"Found network: {network.name} (ID: {network.id})")
+        print(f"Found container: {container.name} (ID: {container.container_id})")
 
         # Ensure both belong to the same host
         if network.host != container.host:
@@ -507,23 +512,54 @@ def connect_container_to_network(request):
         # Connect to Docker host
         client = docker.DockerClient(base_url=network.host.docker_api_url)
 
-        # Get Docker objects
-        docker_network = client.networks.get(network_id)
-        docker_container = client.containers.get(container_id)
+        # Get Docker objects - try by ID first, then by name
+        try:
+            print(f"Trying to get network by ID: {network_id}")
+            docker_network = client.networks.get(network_id)
+            print(f"Successfully got network by ID: {docker_network.name}")
+        except docker.errors.NotFound:
+            print(f"Network not found by ID, trying by name: {network.name}")
+            try:
+                docker_network = client.networks.get(network.name)
+                print(f"Successfully got network by name: {docker_network.name}")
+            except docker.errors.NotFound:
+                print(f"Network not found by name either: {network.name}")
+                return Response({'message': f'Network {network.name} not found in Docker. It may have been deleted.'},
+                                status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            docker_container = client.containers.get(container_id)
+            print(f"Successfully got container: {docker_container.name}")
+        except docker.errors.NotFound:
+            return Response({'message': f'Container {container_id} not found in Docker.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        # Check if container is already connected to this network
+        container_networks = docker_container.attrs['NetworkSettings']['Networks']
+        print(f"Container networks: {list(container_networks.keys())}")
+        if network.name in container_networks:
+            return Response({'message': f'Container {container.name} is already connected to network {network.name}.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Connect container to network
+        print(f"Connecting container {container.name} to network {network.name}")
         docker_network.connect(docker_container)
+        print("Connection successful")
 
         return Response({'message': f'Container {container.name} connected to network {network.name} successfully.'},
                         status=status.HTTP_200_OK)
 
     except Network.DoesNotExist:
+        print(f"Network not found in DB: {network_id}")
         return Response({'message': 'Network not found.'}, status=status.HTTP_404_NOT_FOUND)
     except ContainerRecord.DoesNotExist:
+        print(f"Container not found in DB: {container_id}")
         return Response({'message': 'Container not found.'}, status=status.HTTP_404_NOT_FOUND)
     except docker.errors.APIError as e:
+        print(f"Docker API error: {e}")
         return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
+        print(f"Unexpected error: {e}")
         return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 @api_view(['POST'])
@@ -545,8 +581,21 @@ def disconnect_container_from_network(request):
         # Connect to Docker host
         client = docker.DockerClient(base_url=host.docker_api_url)
 
-        # Get Docker network and disconnect container
-        docker_network = client.networks.get(network_id)
+        # Get Docker network and disconnect container - try by ID first, then by name
+        try:
+            docker_network = client.networks.get(network_id)
+        except docker.errors.NotFound:
+            try:
+                docker_network = client.networks.get(network.name)
+            except docker.errors.NotFound:
+                # Network doesn't exist in Docker, but exists in our DB
+                # This is the case we're trying to handle
+                return Response({
+                    'message': f'Network {network.name} not found in Docker. It may have been deleted externally. Use the cleanup function to handle this.',
+                    'network_deleted': True,
+                    'suggestion': 'Try using the cleanup button to remove invalid network references.'
+                }, status=status.HTTP_404_NOT_FOUND)
+
         docker_network.disconnect(container_id, force=True)
 
         return Response({'message': f'Container {container.name} disconnected from network {network.name}'}, status=status.HTTP_200_OK)
@@ -606,6 +655,62 @@ def container_connected_networks(request, host_id, container_id):
                 })
 
         return Response(connected_networks, status=status.HTTP_200_OK)
+
+    except DockerHost.DoesNotExist:
+        return Response({'message': 'Host not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except ContainerRecord.DoesNotExist:
+        return Response({'message': 'Container not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except docker.errors.APIError as e:
+        return Response({'message': f'Docker error: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def cleanup_container_networks(request, host_id, container_id):
+    """
+    Clean up invalid network references for a container.
+    This handles cases where networks exist in the container's network settings
+    but no longer exist in Docker.
+    """
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        container_record = ContainerRecord.objects.get(container_id=container_id)
+
+        if container_record.host != host:
+            return Response({'message': 'Container does not belong to the given host.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        client = docker.DockerClient(base_url=host.docker_api_url)
+        container = client.containers.get(container_id)
+
+        networks = container.attrs['NetworkSettings']['Networks']
+        cleaned_networks = []
+        removed_networks = []
+
+        for name in networks.keys():
+            try:
+                # Try to get the network from Docker
+                network = client.networks.get(name)
+                cleaned_networks.append({
+                    'id': network.id,
+                    'name': name,
+                    'details': networks[name]
+                })
+            except docker.errors.NotFound:
+                # Network doesn't exist in Docker, mark for removal
+                removed_networks.append(name)
+                # Note: We can't disconnect from a non-existent network
+                # The container's network settings will still show it until the container is restarted
+                # or the Docker daemon is restarted
+
+        return Response({
+            'message': f'Network cleanup completed. Found {len(removed_networks)} invalid network references. Container restart may be needed to fully clear references.',
+            'removed_networks': removed_networks,
+            'cleaned_networks': cleaned_networks,
+            'requires_restart': len(removed_networks) > 0
+        }, status=status.HTTP_200_OK)
 
     except DockerHost.DoesNotExist:
         return Response({'message': 'Host not found.'}, status=status.HTTP_404_NOT_FOUND)
