@@ -11,6 +11,7 @@ import CreateNetwork from './pages/CreateNetwork';
 import ManageNetworks from './pages/ManageNetworks';
 import CreateVolume from './pages/CreateVolume';
 import ManageVolumes from './pages/ManageVolumes';
+import Splash from './pages/Splash';
 
 function App() {
   return (
