@@ -869,3 +869,29 @@ def get_container_volume_bindings(request, host_id, container_id):
         
     except Exception as e:
         return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def host_details(request, host_id):
+    """
+    Returns host details and stats: number of containers, volumes, and networks associated with the host.
+    """
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        containers_count = ContainerRecord.objects.filter(host=host).count()
+        volumes_count = Volume.objects.filter(host=host).count()
+        networks_count = Network.objects.filter(host=host).count()
+        # Optionally, add images count if you track images in DB
+
+        serializer = DockerHostSerializer(host)
+        return Response({
+            "host": serializer.data,
+            "stats": {
+                "containers": containers_count,
+                "volumes": volumes_count,
+                "networks": networks_count
+            }
+        }, status=200)
+    except DockerHost.DoesNotExist:
+        return Response({"message": "Host not found"}, status=404)

@@ -12,6 +12,7 @@ import ManageNetworks from './pages/ManageNetworks';
 import CreateVolume from './pages/CreateVolume';
 import ManageVolumes from './pages/ManageVolumes';
 import Splash from './pages/Splash';
+import HostSelect from './pages/HostSelect';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
         <Route path="/hosts/:hostId/networks" element={<ManageNetworks />} />
         <Route path="hosts/:host_id/volumes/create/" element={<CreateVolume />} />
         <Route path="hosts/:host_id/volumes/" element={<ManageVolumes />} />
+        <Route path="/hosts/:host_id/select/" element={<HostSelect />} />
       </Routes>
     </Router>
   );
