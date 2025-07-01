@@ -69,15 +69,20 @@ class TerminalConsumer(WebsocketConsumer):
     def stream_output(self):
         try:
             while True:
-                data = self.exec_socket.recv(4096)
+                data = self.exec_socket._sock.recv(4096)
                 if not data:
+                    print("No more data, closing stream_output")
                     break
                 self.send(text_data=data.decode('utf-8', errors='replace'))
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Exception in stream_output: {e}")
 
     def receive(self, text_data):
-        self.exec_socket.send(text_data.encode('utf-8'))
+        self.exec_socket._sock.sendall(text_data.encode('utf-8'))
 
     def disconnect(self, close_code):
-        self.exec_socket.close()
+        if hasattr(self, 'exec_socket'):
+            try:
+                self.exec_socket.close()
+            except Exception as e:
+                print(f"Error closing exec_socket: {e}")
