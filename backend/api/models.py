@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 import docker
 from rest_framework.response import Response
-import time
+import uuid
 
 class CustomUser(AbstractUser):
     def __str__(self):
@@ -31,7 +31,7 @@ class ContainerRecord(models.Model):
     internal_ports = models.JSONField(blank=True, null=True)  # {"80/tcp": {}}
     port_bindings = models.JSONField(blank=True, null=True)   # {"80/tcp": [{"HostPort": "8080"}]}
 
-    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='containers')
+    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='containers', to_field='id', db_column='host_id')
 
     volumes = models.ManyToManyField('Volume', related_name='containers', blank=True)
 
@@ -147,6 +147,9 @@ class DockerHost(models.Model):
         ('ssh', 'SSH'),
     ]
 
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, serialize=False)
+    old_id = models.BigIntegerField(null=True)
+
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='docker_hosts')
     host_name = models.CharField(max_length=100)
     host_ip = models.GenericIPAddressField()
@@ -225,7 +228,7 @@ class Network(models.Model):
     internal = models.BooleanField(default=False)
     attachable = models.BooleanField(default=False)
     ingress = models.BooleanField(default=False)
-    host = models.ForeignKey(DockerHost, on_delete=models.CASCADE, related_name='networks')
+    host = models.ForeignKey(DockerHost, on_delete=models.CASCADE, related_name='networks', to_field='id', db_column='host_id')
 
     def __str__(self):
         return f"{self.name} ({self.driver})"
@@ -234,7 +237,7 @@ class Volume(models.Model):
     name = models.CharField(max_length=255, unique=True)
     driver = models.CharField(max_length=100, default='local')
     mountpoint = models.CharField(max_length=255, blank=True, null=True)
-    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='volumes')
+    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='volumes', to_field='id', db_column='host_id')
     created_at = models.DateTimeField(auto_now_add=True)
     labels = models.JSONField(blank=True, null=True)
 
