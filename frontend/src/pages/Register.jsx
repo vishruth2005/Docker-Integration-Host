@@ -26,7 +26,7 @@ export default function Register() {
     const data = await res.json();
     if (res.ok) {
       setTokens(data.tokens);
-      navigate('/');
+      navigate('/home');
     } else {
       alert(data.detail || 'Registration failed');
     }

@@ -18,9 +18,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Splash />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/:host_id/:container_id" element={<ContainerDetail />} />
         <Route path="/hosts/create/" element={<CreateHost />} />
         <Route path="/hosts/:host_id/containers/create/" element={<CreateContainer />} />

@@ -66,7 +66,7 @@ export default function CreateHost() {
       if (response.ok) {
         setSuccess('Docker host created successfully!');
         setTimeout(() => {
-          navigate('/');
+          navigate('/home');
         }, 2000);
       } else {
         switch (response.status) {
@@ -126,7 +126,7 @@ export default function CreateHost() {
                 </p>
               </div>
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/home')}
                 style={{
                   padding: '0.75rem 1.5rem',
                   backgroundColor: '#6b7280',
@@ -564,7 +564,7 @@ export default function CreateHost() {
               }}>
                 <button
                   type="button"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/home')}
                   disabled={isSubmitting}
                   style={{
                     padding: '0.875rem 1.75rem',
