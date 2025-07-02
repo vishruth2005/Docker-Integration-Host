@@ -4,7 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import docker
 
-from api.models import ContainerRecord, DockerHost, Network, Volume
+from api.models import ContainerRecord, DockerHost, Network, Volume, Image
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -156,3 +156,8 @@ class NetworkSerializer(serializers.ModelSerializer):
             'host_id'
         ]
         read_only_fields = ['id', 'created_at', 'host']
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = '__all__'

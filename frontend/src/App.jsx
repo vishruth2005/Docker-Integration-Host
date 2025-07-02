@@ -13,6 +13,8 @@ import CreateVolume from './pages/CreateVolume';
 import ManageVolumes from './pages/ManageVolumes';
 import Splash from './pages/Splash';
 import HostSelect from './pages/HostSelect';
+import CreateImage from './pages/CreateImage';
+import ManageImages from './pages/ManageImage';
 
 function App() {
   return (
@@ -31,6 +33,8 @@ function App() {
         <Route path="hosts/:host_id/volumes/create/" element={<CreateVolume />} />
         <Route path="hosts/:host_id/volumes/" element={<ManageVolumes />} />
         <Route path="/hosts/:host_id/select/" element={<HostSelect />} />
+        <Route path="hosts/:host_id/images/create/" element={<CreateImage />} />
+        <Route path="hosts/:host_id/images/" element={<ManageImages />} />
       </Routes>
     </Router>
   );

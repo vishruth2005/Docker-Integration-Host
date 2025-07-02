@@ -243,3 +243,15 @@ class Volume(models.Model):
 
     def __str__(self):
         return self.name
+
+class Image(models.Model):
+    name = models.CharField(max_length=255)  # e.g. nginx:latest
+    tag = models.CharField(max_length=100, default='latest')
+    image_id = models.CharField(max_length=255, unique=True)  # SHA or digest
+    size = models.BigIntegerField(null=True, blank=True)  # in bytes
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    host = models.ForeignKey('DockerHost', on_delete=models.CASCADE, related_name='images', to_field='id', db_column='host_id')
+
+    def __str__(self):
+        return f"{self.name}:{self.tag} ({self.host.host_name})"

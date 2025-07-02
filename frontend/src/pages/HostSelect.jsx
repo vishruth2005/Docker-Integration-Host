@@ -102,6 +102,21 @@ export default function HostSelect() {
             borderColor: 'rgba(245, 158, 11, 0.3)',
             shadowColor: 'rgba(245, 158, 11, 0.5)',
             onClick: () => navigate(`/hosts/${host_id}/networks`)
+        },
+        {
+            title: 'Images',
+            description: 'Manage Docker images',
+            count: hostStats.images,
+            icon: (
+                <svg style={{ width: '2.5rem', height: '2.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+            ),
+            color: '#06b6d4',
+            bgColor: 'rgba(6, 182, 212, 0.15)',
+            borderColor: 'rgba(6, 182, 212, 0.3)',
+            shadowColor: 'rgba(6, 182, 212, 0.5)',
+            onClick: () => navigate(`/hosts/${host_id}/images/`)
         }
     ];
 
@@ -166,7 +181,7 @@ export default function HostSelect() {
             background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)',
             margin: 0,
             padding: 0,
-            position: 'fixed',
+            position: 'absolute',
             top: 0,
             left: 0,
             overflowY: 'auto'
@@ -308,7 +323,7 @@ export default function HostSelect() {
                                     padding: '1.5rem',
                                     border: '1px solid rgba(255, 255, 255, 0.1)'
                                 }}>
-                                    <div style={{ fontSize: '2rem', fontWeight: '700', color: '#8b5cf6', marginBottom: '0.5rem' }}>
+                                    <div style={{ fontSize: '2rem', fontWeight: '700', color: '#06b6d4', marginBottom: '0.5rem' }}>
                                         {hostStats.images}
                                     </div>
                                     <div style={{ color: '#9ca3af', fontSize: '0.875rem', fontWeight: '500' }}>
@@ -339,7 +354,7 @@ export default function HostSelect() {
                         display: 'grid', 
                         gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
                         gap: '1.5rem',
-                        maxWidth: '50rem',
+                        maxWidth: '80rem',
                         margin: '0 auto'
                     }}>
                         {managementOptions.map((option, index) => (

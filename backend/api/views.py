@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework import status
-from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer, NetworkSerializer, VolumeSerializer
-from .models import ContainerRecord, DockerHost, Network, Volume
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, CustomTokenObtainPairSerializer, ContainerRecordSerializer, DockerHostSerializer, NetworkSerializer, VolumeSerializer, ImageSerializer
+from .models import ContainerRecord, DockerHost, Network, Volume, Image
 from django.contrib.auth.models import Group, Permission
 from rest_framework_simplejwt.tokens import RefreshToken
 import docker
@@ -14,6 +14,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.utils.timezone import now
 
 
 def create_default_groups():
@@ -226,9 +227,26 @@ def create_container(request, host_id):
 
             # Pull image if not found
             try:
-                client.images.get(request.data['image'])
+                img = client.images.get(request.data['image'])
             except docker.errors.NotFound:
-                client.images.pull(request.data['image'])
+                img = client.images.pull(request.data['image'])
+
+            # Parse details from image object
+            image_id = img.id.split(':')[-1]
+            tags = img.tags or ['<none>:<none>']
+            repository, tag = tags[0].split(':') if ':' in tags[0] else (tags[0], 'latest')
+            size_mb = round(img.attrs['Size'] / (1024 * 1024), 2)
+
+            # Save to DB only if not already tracked
+            if not Image.objects.filter(image_id=image_id, host=host).exists():
+                Image.objects.create(
+                    host=host,
+                    image_id=image_id,
+                    repository=repository,
+                    tag=tag,
+                    size_mb=size_mb,
+                    created_at=now()
+                )
 
             docker_container = client.containers.create(**container_config)
 
@@ -882,7 +900,7 @@ def host_details(request, host_id):
         containers_count = ContainerRecord.objects.filter(host=host).count()
         volumes_count = Volume.objects.filter(host=host).count()
         networks_count = Network.objects.filter(host=host).count()
-        # Optionally, add images count if you track images in DB
+        images_count = Image.objects.filter(host=host).count()
 
         serializer = DockerHostSerializer(host)
         return Response({
@@ -890,8 +908,94 @@ def host_details(request, host_id):
             "stats": {
                 "containers": containers_count,
                 "volumes": volumes_count,
-                "networks": networks_count
+                "networks": networks_count,
+                "images": images_count
             }
         }, status=200)
     except DockerHost.DoesNotExist:
         return Response({"message": "Host not found"}, status=404)
+    
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_images_by_host(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+
+        # Only owner or admin can access
+        if not (request.user == host.owner or request.user.is_admin()):
+            return Response({'detail': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        images = Image.objects.filter(host=host)
+        serializer = ImageSerializer(images, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except DockerHost.DoesNotExist:
+        return Response({'detail': 'Docker host not found'}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def create_image(request, host_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+
+        if not (request.user == host.owner or request.user.is_admin()):
+            return Response({'detail': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        image_name = request.data.get('name')
+        tag = request.data.get('tag', 'latest')
+        if not image_name:
+            return Response({'detail': 'Image name required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Connect to Docker and pull the image
+        client = docker.DockerClient(base_url=host.docker_api_url)
+        pulled_image = client.images.pull(f"{image_name}:{tag}")
+
+        # Extract metadata
+        image_id = pulled_image.id
+        size = pulled_image.attrs.get('Size', 0)
+
+        image, created = Image.objects.get_or_create(
+            image_id=image_id,
+            defaults={
+                'name': image_name,
+                'tag': tag,
+                'size': size,
+                'host': host,
+            }
+        )
+
+        serializer = ImageSerializer(image)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    except DockerHost.DoesNotExist:
+        return Response({'detail': 'Host not found'}, status=status.HTTP_404_NOT_FOUND)
+    except docker.errors.APIError as e:
+        return Response({'detail': f'Docker error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_image(request, host_id, image_id):
+    try:
+        host = DockerHost.objects.get(id=host_id)
+        image = Image.objects.get(id=image_id, host=host)
+
+        if not (request.user == host.owner or request.user.is_admin()):
+            return Response({'detail': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Attempt to remove from Docker engine
+        client = docker.DockerClient(base_url=host.docker_api_url)
+        try:
+            client.images.remove(image.image_id, force=True)
+        except docker.errors.ImageNotFound:
+            pass  # Ignore if already gone
+
+        image.delete()
+        return Response({'detail': 'Image deleted'}, status=status.HTTP_204_NO_CONTENT)
+
+    except DockerHost.DoesNotExist:
+        return Response({'detail': 'Host not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Image.DoesNotExist:
+        return Response({'detail': 'Image not found'}, status=status.HTTP_404_NOT_FOUND)
