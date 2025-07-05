@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function ManageVolumes() {
   const { host_id } = useParams();
@@ -15,7 +16,7 @@ export default function ManageVolumes() {
   const fetchHost = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${host_id}/details/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${host_id}/details/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -32,7 +33,7 @@ export default function ManageVolumes() {
 
   const fetchVolumes = () => {
     const token = getAccessToken();
-    fetch(`http://localhost:8000/hosts/${host_id}/volumes/`, {
+    fetch(`${API_BASE_URL}/hosts/${host_id}/volumes/`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json().then(data => ({ status: res.status, body: data })))
@@ -61,7 +62,7 @@ export default function ManageVolumes() {
     if (!window.confirm('Are you sure you want to delete this volume?')) return;
     setDeletingVolume(volume_id);
     const token = getAccessToken();
-    fetch(`http://localhost:8000/volumes/${volume_id}/delete/`, {
+    fetch(`${API_BASE_URL}/volumes/${volume_id}/delete/`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`

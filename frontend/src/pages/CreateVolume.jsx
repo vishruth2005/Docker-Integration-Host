@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function CreateVolume() {
   const { host_id } = useParams();
@@ -28,7 +29,7 @@ export default function CreateVolume() {
 
     try {
       const token = getAccessToken();
-      const response = await fetch(`http://localhost:8000/hosts/${host_id}/volumes/create/`, {
+      const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/volumes/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

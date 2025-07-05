@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function ManageNetworks() {
   const { hostId } = useParams();
@@ -15,7 +16,7 @@ export default function ManageNetworks() {
   const fetchHost = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${hostId}/details/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${hostId}/details/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -34,7 +35,7 @@ export default function ManageNetworks() {
   const fetchNetworks = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${hostId}/networks/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${hostId}/networks/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -64,7 +65,7 @@ export default function ManageNetworks() {
     setDeletingNetwork(networkId);
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/networks/${networkId}/delete/`, {
+      const res = await fetch(`${API_BASE_URL}/networks/${networkId}/delete/`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

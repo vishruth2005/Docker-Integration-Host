@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function ManageImages() {
   const { host_id } = useParams();
@@ -15,7 +16,7 @@ export default function ManageImages() {
   const fetchHost = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${host_id}/details/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${host_id}/details/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -35,7 +36,7 @@ export default function ManageImages() {
   const fetchImages = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${host_id}/images/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${host_id}/images/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -67,7 +68,7 @@ export default function ManageImages() {
     setDeletingImage(imageId);
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/hosts/${host_id}/images/${imageId}/`, {
+      const res = await fetch(`${API_BASE_URL}/hosts/${host_id}/images/${imageId}/`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

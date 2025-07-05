@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function CreateImage() {
   const { host_id } = useParams();
@@ -27,7 +28,7 @@ export default function CreateImage() {
 
     try {
       const token = getAccessToken();
-      const response = await fetch(`http://localhost:8000/hosts/${host_id}/images/create/`, {
+      const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/images/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

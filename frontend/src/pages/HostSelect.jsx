@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function HostSelect() {
     const { host_id } = useParams();  
@@ -19,7 +20,7 @@ export default function HostSelect() {
         const fetchHostDetails = async () => {
             const token = getAccessToken();
             try {
-                const response = await fetch(`http://localhost:8000/hosts/${host_id}/details/`, {
+                const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/details/`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

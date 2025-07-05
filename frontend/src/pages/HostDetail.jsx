@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { getHostDetails } from '../api/hostApi'; // Assuming you have an API utility for fetching host details
 
 export default function HostDetail() {
     const { host_id } = useParams();  
@@ -15,7 +16,7 @@ export default function HostDetail() {
         const fetchHostDetails = async () => {
             const token = getAccessToken();
             try {
-                const response = await fetch(`http://localhost:8000/hosts/${host_id}/containers/`, {
+                const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/containers/`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -52,7 +53,7 @@ export default function HostDetail() {
         const token = getAccessToken();
         
         try {
-            const res = await fetch(`http://localhost:8000/hosts/${host_id}/containers/${container_id}/delete/`, {
+            const res = await fetch(`${API_BASE_URL}/hosts/${host_id}/containers/${container_id}/delete/`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`

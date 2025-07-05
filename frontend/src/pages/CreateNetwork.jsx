@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getAccessToken, logout } from '../utils/auth';
 import { useNavigate, useParams } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 export default function CreateNetwork() {
   const { hostId } = useParams();
@@ -33,7 +34,7 @@ export default function CreateNetwork() {
     setSuccess('');
     setIsSubmitting(true);
   
-    fetch('http://localhost:8000/networks/create/', {
+    fetch(`${API_BASE_URL}/networks/create/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

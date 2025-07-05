@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAccessToken } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function CreateHost() {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ export default function CreateHost() {
     const token = getAccessToken();
 
     try {
-      const response = await fetch('http://localhost:8000/hosts/create/', {
+      const response = await fetch(`${API_BASE_URL}/hosts/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

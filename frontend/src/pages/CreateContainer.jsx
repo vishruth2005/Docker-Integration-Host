@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getAccessToken } from '../utils/auth';
+import { API_BASE_URL, WS_BASE_URL } from '../config';
 
 export default function CreateContainer() {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function CreateContainer() {
     const fetchVolumes = async () => {
       const token = getAccessToken();
       try {
-        const response = await fetch(`http://localhost:8000/hosts/${host_id}/volumes/`, {
+        const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/volumes/`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.ok) {
@@ -47,7 +48,7 @@ export default function CreateContainer() {
 
     try {
       const token = getAccessToken();
-      const response = await fetch(`http://localhost:8000/hosts/${host_id}/containers/create/`, {
+      const response = await fetch(`${API_BASE_URL}/hosts/${host_id}/containers/create/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

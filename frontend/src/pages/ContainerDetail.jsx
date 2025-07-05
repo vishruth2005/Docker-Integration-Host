@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
+import { API_BASE_URL, WS_BASE_URL } from '../config';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -169,7 +170,7 @@ export default function ContainerDetail() {
   const fetchContainerDetails = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -188,7 +189,7 @@ export default function ContainerDetail() {
   const fetchVolumeBindings = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/volumes/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/volumes/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -213,7 +214,7 @@ export default function ContainerDetail() {
     const token = getAccessToken();
     try {
       // Get connected networks
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/networks/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/networks/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -226,7 +227,7 @@ export default function ContainerDetail() {
       setConnectedNetworks(connectedData);
   
       // Get all available networks
-      const allRes = await fetch(`http://localhost:8000/hosts/${host_id}/networks/`, {
+      const allRes = await fetch(`${API_BASE_URL}/hosts/${host_id}/networks/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const allData = await allRes.json();
@@ -262,7 +263,7 @@ export default function ContainerDetail() {
     const token = getAccessToken();
     const endpoint = action === 'start' ? 'start' : 'stop';
     try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/${endpoint}/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/${endpoint}/`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -284,7 +285,7 @@ export default function ContainerDetail() {
     setLiveLogs([]); // Clear previous logs
     
     // Connect to WebSocket for live logs
-    const socket = new WebSocket('ws://localhost:8000/ws/socket-server/');
+    const socket = new WebSocket(`${WS_BASE_URL}/ws/socket-server/`);
     
     socket.onopen = () => {
       console.log('WebSocket connected for logs');
@@ -324,7 +325,7 @@ export default function ContainerDetail() {
   const handleViewStats = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/stats/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/stats/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -363,7 +364,7 @@ export default function ContainerDetail() {
     
     if (container && container.status === 'running') {
       // Connect to WebSocket for live stats
-      statsSocket = new WebSocket('ws://localhost:8000/ws/stats/');
+      statsSocket = new WebSocket(`${WS_BASE_URL}/ws/stats/`);
       
       statsSocket.onopen = () => {
         console.log('WebSocket connected for stats');
@@ -423,7 +424,7 @@ export default function ContainerDetail() {
       console.log('All networks data:', allNetworks);
       console.log('Connected networks data:', connectedNetworks);
       
-      const res = await fetch('http://localhost:8000/networks/connect/', {
+      const res = await fetch(`${API_BASE_URL}/networks/connect/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -456,7 +457,7 @@ export default function ContainerDetail() {
     try {
       console.log('Disconnecting from network:', networkId, 'for container:', container.container_id);
       
-      const res = await fetch('http://localhost:8000/networks/disconnect/', {
+      const res = await fetch(`${API_BASE_URL}/networks/disconnect/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -497,7 +498,7 @@ export default function ContainerDetail() {
   const cleanupInvalidNetworks = async () => {
     const token = getAccessToken();
     try {
-      const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/networks/cleanup/`, {
+      const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/networks/cleanup/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -529,7 +530,7 @@ export default function ContainerDetail() {
     setShowTerminal(true);
 
     // Step 1: Create exec session via REST API
-    const res = await fetch(`http://localhost:8000/${host_id}/${container_id}/exec/`, {
+    const res = await fetch(`${API_BASE_URL}/${host_id}/${container_id}/exec/`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -541,7 +542,7 @@ export default function ContainerDetail() {
     const exec_id = data.exec_id;
 
     // Step 2: Open WebSocket to terminal endpoint
-    const wsUrl = `ws://localhost:8000/ws/terminal/${container_id}/${exec_id}/`;
+    const wsUrl = `${WS_BASE_URL}/ws/terminal/${container_id}/${exec_id}/`;
     const ws = new window.WebSocket(wsUrl);
 
     ws.onopen = () => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAccessToken, logout } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 // Function to decode JWT payload
 function decodeToken(token) {
@@ -44,7 +45,7 @@ export default function Home() {
     else if (userRole === 'viewer') endpoint = '/viewer-only/';
 
     setLoading(true);
-    fetch(`http://localhost:8000${endpoint}`, {
+    fetch(`${API_BASE_URL}${endpoint}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => {

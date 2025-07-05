@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setTokens } from '../utils/auth';
+import { API_BASE_URL } from '../config';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -17,7 +18,7 @@ export default function Register() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    const res = await fetch('http://localhost:8000/register/', {
+    const res = await fetch(`${API_BASE_URL}/register/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),
