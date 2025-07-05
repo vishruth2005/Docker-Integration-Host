@@ -41,8 +41,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'api'
+    'api',
+    'channels',
 ]
+
+ASGI_APPLICATION = "home.asgi.application"
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -80,7 +83,7 @@ CORS_ALLOWED_ORIGINS = [
 
 ROOT_URLCONF = "home.urls"
 
-AUTH_USER_MODEL = "api.CustomUser"
+AUTH_USER_MODEL = 'api.CustomUser'
 
 TEMPLATES = [
     {

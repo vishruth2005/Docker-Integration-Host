@@ -4,7 +4,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 import docker
 
-from api.models import ContainerRecord, DockerHost
+from api.models import ContainerRecord, DockerHost, Network, Volume, Image
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -65,36 +65,37 @@ class DockerHostSerializer(serializers.ModelSerializer):
             'total_memory_mb', 'running_containers_count', 'total_images_count',
             'created_at', 'updated_at', 'labels'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'connection_protocol', 'status', 'host_ip', 'port']
+        read_only_fields = ['created_at', 'updated_at', 'connection_protocol', 'status']
 
     def create(self, validated_data):
-        user = self.context['request'].user
-        return DockerHost.objects.create(owner=user, **validated_data)
+        # user = self.context['request'].user
+        return DockerHost.objects.create(**validated_data)
 
     def validate(self, data):
-        if data['connection_protocol'] == 'tcp' and not data.get('port'):
+        connection_protocol = data.get('connection_protocol')
+        auth_type = data.get('auth_type')
+
+        if connection_protocol == 'tcp' and not data.get('port'):
             raise serializers.ValidationError("Port is required for TCP connections")
-        if data['auth_type'] == 'tls' and not (data.get('tls_cert') and data.get('tls_key')):
-            raise serializers.ValidationError("TLS certificate and key are required for TLS authentication")
+
+        if auth_type == 'tls':
+            if not data.get('tls_cert') or not data.get('tls_key'):
+                raise serializers.ValidationError("TLS certificate and key are required for TLS authentication")
+
         return data
-    
-    def test_connection(self):
-        try:
-            client = docker.DockerClient(base_url=f'{self.connection_protocol}://{self.host_ip}:{self.port}')
-            client.ping()
-            self.status = 'active'
-            self.save()
-            return True
-        except Exception as e:
-            self.status = 'inactive'
-            self.save()
-            return False
+
+class VolumeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Volume
+        fields = ['id', 'name', 'driver', 'mountpoint', 'labels', 'created_at', 'host']
+        read_only_fields = ['id', 'name', 'created_at', 'mountpoint']
 
 class ContainerRecordSerializer(serializers.ModelSerializer):
     host = DockerHostSerializer(read_only=True)
     created_by = serializers.SerializerMethodField()
     editable_by = serializers.SerializerMethodField()
     viewable_by = serializers.SerializerMethodField()
+    volumes = VolumeSerializer(many=True, read_only=True)
 
     class Meta:
         model = ContainerRecord
@@ -115,6 +116,7 @@ class ContainerRecordSerializer(serializers.ModelSerializer):
             'viewable_by',
             'last_updated',
             'is_active',
+            'volumes',
         ]
         read_only_fields = [
             'created_at',
@@ -130,3 +132,32 @@ class ContainerRecordSerializer(serializers.ModelSerializer):
 
     def get_viewable_by(self, obj):
         return [user.username for user in obj.viewable_by.all()]
+    
+class NetworkSerializer(serializers.ModelSerializer):
+    host = DockerHostSerializer(read_only=True)
+    host_id = serializers.PrimaryKeyRelatedField(
+        queryset=DockerHost.objects.all(),
+        source='host',
+        write_only=True
+    )
+
+    class Meta:
+        model = Network
+        fields = [
+            'id',
+            'name',
+            'driver',
+            'scope',
+            'internal',
+            'attachable',
+            'ingress',
+            'created_at',
+            'host',
+            'host_id'
+        ]
+        read_only_fields = ['id', 'created_at', 'host']
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = '__all__'
