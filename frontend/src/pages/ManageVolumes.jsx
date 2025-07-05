@@ -103,6 +103,42 @@ export default function ManageVolumes() {
 
   return (
     <div style={{ minHeight: '100vh', width: '100vw', background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)', margin: 0, padding: 0, position: 'fixed', top: 0, left: 0, overflowY: 'auto' }}>
+      {/* Back Button */}
+      <div style={{ position: 'fixed', top: '2rem', left: '2rem', zIndex: 20 }}>
+        <button
+          onClick={() => navigate(`/hosts/${host_id}/select/`)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#6b7280',
+            color: 'white',
+            borderRadius: '0.75rem',
+            border: 'none',
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '0.875rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#4b5563';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 8px -1px rgba(0, 0, 0, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#6b7280';
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          }}
+        >
+          <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back
+        </button>
+      </div>
       {/* Logout Button */}
       <div style={{ position: 'fixed', top: '2rem', right: '2rem', zIndex: 20 }}>
         <button
