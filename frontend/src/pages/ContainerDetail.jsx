@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAccessToken, logout } from '../utils/auth';
 import { Line } from 'react-chartjs-2';
@@ -37,6 +37,7 @@ export default function ContainerDetail() {
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [liveLogs, setLiveLogs] = useState([]);
   const [ws, setWs] = useState(null);
+  const [statsWs, setStatsWs] = useState(null);
   const [terminalWs, setTerminalWs] = useState(null);
   const [terminalOutput, setTerminalOutput] = useState('');
   const [command, setCommand] = useState('');
@@ -57,6 +58,10 @@ export default function ContainerDetail() {
       fill: true
     }]
   });
+
+  // Previous CPU time for percentage calculation using refs
+  const prevCpuTimeRef = useRef(null);
+  const prevTimestampRef = useRef(null);
 
   const [memoryData, setMemoryData] = useState({
     labels: [],
@@ -98,13 +103,23 @@ export default function ContainerDetail() {
   const updateChartData = (newStats) => {
     const now = new Date().toLocaleTimeString();
     
+    // Calculate CPU percentage
+    let cpuPercentage = 0;
+    if (prevCpuTimeRef.current !== null && prevTimestampRef.current !== null) {
+      const cpuDelta = newStats.cpu_total_time_sec - prevCpuTimeRef.current;
+      const timeDelta = (new Date(newStats.timestamp) - new Date(prevTimestampRef.current)) / 1000; // Convert to seconds
+      if (timeDelta > 0) {
+        cpuPercentage = (cpuDelta / timeDelta) * 100; // Convert to percentage
+      }
+    }
+    
     // Update CPU data
     setCpuData(prev => ({
       ...prev,
       labels: [...prev.labels.slice(-19), now],
       datasets: [{
         ...prev.datasets[0],
-        data: [...prev.datasets[0].data.slice(-19), newStats.cpu_total_time_sec || 0]
+        data: [...prev.datasets[0].data.slice(-19), Math.round(cpuPercentage * 100) / 100]
       }]
     }));
 
@@ -238,8 +253,10 @@ export default function ContainerDetail() {
   useEffect(() => {
     return () => {
       if (terminalWs) terminalWs.close();
+      if (ws) ws.close();
+      // Don't close statsWs here as it's managed by its own useEffect
     };
-  }, [terminalWs]);
+  }, [terminalWs, ws]);
   
   const handleAction = async (action) => {
     const token = getAccessToken();
@@ -263,30 +280,44 @@ export default function ContainerDetail() {
   };
 
   const handleViewLogs = () => {
+    setShowLogs(true);
+    setLiveLogs([]); // Clear previous logs
+    
+    // Connect to WebSocket for live logs
     const socket = new WebSocket('ws://localhost:8000/ws/socket-server/');
     
     socket.onopen = () => {
-      console.log('WebSocket connected');
-      socket.send(JSON.stringify({ container_id: container.container_id }));  // Just to trigger backend send
+      console.log('WebSocket connected for logs');
+      // Send container_id to start streaming logs
+      socket.send(JSON.stringify({ container_id: container.container_id }));
     };
   
     socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'log') {
-        setLiveLogs(prev => [...prev, data.message]);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'log') {
+          setLiveLogs(prev => [...prev, data.message]);
+        } else if (data.type === 'error') {
+          setLiveLogs(prev => [...prev, `Error: ${data.message}`]);
+        } else if (data.type === 'connection_established') {
+          console.log('WebSocket connection established');
+        }
+      } catch (err) {
+        console.error('Error parsing WebSocket message:', err);
       }
     };
   
     socket.onerror = (err) => {
       console.error('WebSocket error:', err);
+      setLiveLogs(prev => [...prev, 'WebSocket connection error']);
     };
   
     socket.onclose = () => {
       console.log('WebSocket disconnected');
+      setLiveLogs(prev => [...prev, 'WebSocket connection closed']);
     };
   
     setWs(socket);
-    setShowLogs(true);
   };
   
 
@@ -309,23 +340,80 @@ export default function ContainerDetail() {
     }
   };
 
-  // Fetch stats periodically when container is running
+  // Start real-time stats streaming when container is running
   useEffect(() => {
-    let interval;
+    let statsSocket = null;
+    
+    // Reset chart data when container status changes
+    if (container?.status !== 'running') {
+      setCpuData(prev => ({ ...prev, labels: [], datasets: [{ ...prev.datasets[0], data: [] }] }));
+      setMemoryData(prev => ({ ...prev, labels: [], datasets: [{ ...prev.datasets[0], data: [] }] }));
+      setNetworkData(prev => ({ 
+        ...prev, 
+        labels: [], 
+        datasets: [
+          { ...prev.datasets[0], data: [] },
+          { ...prev.datasets[1], data: [] }
+        ] 
+      }));
+      // Reset refs
+      prevCpuTimeRef.current = null;
+      prevTimestampRef.current = null;
+    }
+    
     if (container && container.status === 'running') {
-      // Fetch initial stats
-      handleViewStats();
+      // Connect to WebSocket for live stats
+      statsSocket = new WebSocket('ws://localhost:8000/ws/stats/');
       
-      // Set up periodic fetching every 5 seconds
-      interval = setInterval(() => {
-        handleViewStats();
-      }, 5000);
+      statsSocket.onopen = () => {
+        console.log('WebSocket connected for stats');
+        // Send container_id to start streaming stats
+        statsSocket.send(JSON.stringify({ container_id: container.container_id }));
+      };
+    
+      statsSocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'stats') {
+            // Store previous values for next calculation
+            prevCpuTimeRef.current = data.data.cpu_total_time_sec;
+            prevTimestampRef.current = data.data.timestamp;
+            
+            setStats(data.data);
+            updateChartData(data.data);
+          } else if (data.type === 'error') {
+            console.error('Stats WebSocket error:', data.message);
+          } else if (data.type === 'connection_established') {
+            console.log('Stats WebSocket connection established');
+          }
+        } catch (err) {
+          console.error('Error parsing stats WebSocket message:', err);
+        }
+      };
+    
+      statsSocket.onerror = (err) => {
+        console.error('Stats WebSocket error:', err);
+      };
+    
+      statsSocket.onclose = () => {
+        console.log('Stats WebSocket disconnected');
+      };
+    
+      setStatsWs(statsSocket);
+    } else {
+      // Close stats WebSocket if container is not running
+      if (statsWs) {
+        statsWs.close();
+        setStatsWs(null);
+      }
     }
     
     return () => {
-      if (interval) clearInterval(interval);
+      if (statsSocket) {
+        statsSocket.close();
+      }
     };
-  }, [container?.status]);
+  }, [container?.status, container?.container_id]);
 
   const handleConnectNetwork = async () => {
     const token = getAccessToken();
@@ -522,7 +610,7 @@ export default function ContainerDetail() {
       overflowY: 'auto',
       position: 'relative'
     }}>
-      {/* Custom styles for network dropdown */}
+      {/* Custom styles for network dropdown and animations */}
       <style>
         {`
           .network-select {
@@ -542,6 +630,11 @@ export default function ContainerDetail() {
             outline: none !important;
             border-color: #3b82f6 !important;
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+          }
+          @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
           }
         `}
       </style>
@@ -1099,7 +1192,23 @@ export default function ContainerDetail() {
               marginBottom: '2rem',
               border: '1px solid rgba(255,255,255,0.08)'
             }}>
-              <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: '700', marginBottom: '1rem' }}>Live Stats</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h2 style={{ color: 'white', fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>Live Stats</h2>
+                {container?.status === 'running' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ 
+                      width: '0.5rem', 
+                      height: '0.5rem', 
+                      borderRadius: '50%',
+                      backgroundColor: '#10b981',
+                      animation: 'pulse 2s infinite'
+                    }}></div>
+                    <span style={{ color: '#10b981', fontSize: '0.75rem', fontWeight: '600' }}>
+                      LIVE
+                    </span>
+                  </div>
+                )}
+              </div>
               
               {/* CPU Chart */}
               <div style={{ marginBottom: '1.5rem' }}>
@@ -1281,7 +1390,7 @@ export default function ContainerDetail() {
                     Start Container
                   </button>
                 )}
-                <button onClick={() => setShowLogs(true)}
+                <button onClick={handleViewLogs}
                   style={{
                     padding: '0.75rem 1.5rem',
                     backgroundColor: '#3b82f6',
@@ -1415,7 +1524,10 @@ export default function ContainerDetail() {
                 {liveLogs.length} log entries
               </span>
               <button
-                onClick={handleViewLogs}
+                onClick={() => {
+                  if (ws) ws.close();
+                  handleViewLogs();
+                }}
                 style={{
                   padding: '0.5rem 1rem',
                   backgroundColor: '#3b82f6',
