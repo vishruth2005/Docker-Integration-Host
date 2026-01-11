@@ -1,0 +1,60 @@
+services:
+  dih-postgres:
+    image: postgres:latest
+    container_name: dih-postgres
+    environment:
+      - POSTGRES_DB=Docker-Integration-Host
+      - POSTGRES_USER=Admin
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5000:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - dih-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U Admin -d Docker-Integration-Host"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dih-migrate:
+    image: dih-backend:latest
+    container_name: dih-migrate
+    networks:
+      - dih-network
+    depends_on:
+      dih-postgres:
+        condition: service_healthy
+    command: python manage.py migrate
+
+  dih-backend:
+    image: dih-backend:latest
+    container_name: dih-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dih-network
+    depends_on:
+      dih-migrate:
+        condition: service_completed_successfully
+
+  dih-frontend:
+    image: dih-frontend:latest
+    container_name: dih-frontend
+    ports:
+      - "5173:80"
+    networks:
+      - dih-network
+    depends_on:
+      - dih-backend
+
+networks:
+  dih-network:
+    name: dih-network
+    driver: bridge
+
+volumes:
+  pgdata:

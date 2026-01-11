@@ -1,0 +1,17 @@
+# Ignore local python virtual environments
+venv/
+.venv/
+env/
+
+# Ignore IDE settings
+.vscode/
+.idea/
+
+# Ignore git and logs
+.git
+*.log
+
+# Ignore large data or build artifacts
+__pycache__/
+*.pyc
+node_modules/

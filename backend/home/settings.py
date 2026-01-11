@@ -111,8 +111,8 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'Docker-Integration-Host',
         'USER': 'Admin',
-        'PASSWORD': 'Hamsa@2005',
-        'HOST': 'localhost',
+        'PASSWORD': 'password',
+        'HOST': 'dih-postgres',
         'PORT': '5432',
     }
 }

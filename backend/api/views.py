@@ -242,9 +242,9 @@ def create_container(request, host_id):
                 Image.objects.create(
                     host=host,
                     image_id=image_id,
-                    repository=repository,
+                    # repository=repository,
                     tag=tag,
-                    size_mb=size_mb,
+                    # size_mb=size_mb,
                     created_at=now()
                 )
 
