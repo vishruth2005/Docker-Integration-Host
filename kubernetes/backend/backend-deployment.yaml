@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dih-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dih-backend
+  template:
+    metadata:
+      labels:
+        app: dih-backend
+    spec:
+      # --- CRITICAL: Security context to allow root-level socket access ---
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+
+      # --- 1. THE MIGRATION (INIT CONTAINER) ---
+      initContainers:
+      - name: dih-migrate
+        image: dih-backend:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "manage.py", "migrate"]
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: DATABASE_HOST
+          value: "dih-postgres"
+
+      # --- 2. THE MAIN BACKEND SERVER ---
+      containers:
+      - name: dih-backend
+        image: dih-backend:latest
+        imagePullPolicy: IfNotPresent
+        # Essential for communicating with the Docker Daemon
+        securityContext:
+          privileged: true
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: DATABASE_HOST
+          value: "dih-postgres"
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+      
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket

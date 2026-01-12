@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dih-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dih-frontend
+  template:
+    metadata:
+      labels:
+        app: dih-frontend
+    spec:
+      containers:
+      - name: dih-frontend
+        image: dih-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80

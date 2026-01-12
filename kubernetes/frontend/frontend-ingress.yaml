@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dih-ingress
+  annotations:
+    # Standard WebSocket Headers
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Note: Modern NGINX controllers often handle the "Upgrade" 
+    # and "Connection" headers automatically if the backend is 
+    # detected as WebSocket-capable, but keeping timeouts is key.
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      # --- Handle the double /ws/ws or single /ws ---
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: dih-backend
+            port:
+              number: 8000
+      # --- API Backend ---
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: dih-backend
+            port:
+              number: 8000
+      # --- Frontend ---
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dih-frontend
+            port:
+              number: 80
