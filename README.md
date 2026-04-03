@@ -1,4 +1,4 @@
-# 🐳 Docker Integration Host
+# 🐳 Docker Integration Host with Kubernetes Setup
 
 ## 📋 Table of Contents
 
@@ -21,32 +21,40 @@ This tool is designed for developers, DevOps engineers, and teams working with d
 ## 🚀 Key Features
 
 ### 🔌 Multi-Daemon Support
+
 Connect and manage multiple remote Docker daemons from a single host interface.
 
 ### 🐳 Container Lifecycle Management
+
 - Create, start, stop, restart, and delete containers
 - Inspect container details and metadata
 
 ### 🌐 Network Management
+
 - Create and delete Docker networks
 - Attach/detach containers from networks
 
 ### 📂 Volume and Bind Mounts
+
 - Create and delete volumes
 - Configure bind mounts for persistent storage and host access
 
 ### 🖼️ Image Management
+
 - Pull images from Docker Hub or private registries
 - Build and manage custom images
 
 ### 📜 Live Logs and Interactive Execution
+
 - View real-time logs from running containers
 - WebSocket-powered terminals for executing commands inside containers
 
 ### 📊 Live Resource Monitoring
+
 - Monitor CPU, memory, and network usage in real-time
 
 ### 🔒 Secure Access
+
 - JWT-based authentication for REST APIs and WebSocket communication
 
 ---
@@ -62,9 +70,10 @@ Connect and manage multiple remote Docker daemons from a single host interface.
 **API Gateway**: Dual-channel communication system with Django REST API for standard operations and WebSocket server for real-time data streaming.
 
 **Backend Services**: Modular service architecture handling specific Docker operations:
+
 - Container lifecycle management
 - Network configuration
-- Volume management  
+- Volume management
 - Image handling
 - Resource monitoring
 - Log streaming
@@ -100,12 +109,14 @@ npm run dev
 ## 🛠️ Technology Stack
 
 ### 🧠 Backend Technologies
+
 - **Django REST Framework** – Scalable API development
 - **Django Channels** – WebSocket support for real-time communication
 - **Daphne** – ASGI server for HTTP and WebSocket handling
 - **JWT Authentication** – Secure token-based authentication
 
 ### 🎨 Frontend Technologies
+
 - **React** – Component-based UI framework
 - **Tailwind CSS** – Utility-first CSS framework
 - **Vite** – Fast development server and build tool
@@ -115,12 +126,15 @@ npm run dev
 ## 📖 Usage Guide
 
 ### 🔐 Authentication and Dashboard
+
 After successful login, you'll access the **Dashboard** displaying all connected Docker hosts. Use **Create Host** to add new Docker daemon connections.
 
 ### 🖥️ Host Management
+
 Select any connected host to access its management interface with four main sections:
 
 #### 🐳 Containers Section
+
 - View all existing containers
 - Create new containers using the **Create Container** button
 - Access individual container management:
@@ -133,17 +147,20 @@ Select any connected host to access its management interface with four main sect
   - Configure volume bindings
 
 #### 📂 Volumes Section
+
 - Browse available volumes
 - Create new volumes
 - Delete existing volumes
 
 #### 🌐 Networks Section
+
 - List and manage Docker networks
 - Create custom networks
 - Delete networks
 - Manage container network attachments
 
 #### 🖼️ Images Section
+
 - Browse Docker images on the host
 - Pull images from registries
 - Delete unused images
